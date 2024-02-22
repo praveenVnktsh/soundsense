@@ -71,7 +71,7 @@
 7.0	frames/00070.png
 7.1	frames/00071.png
 7.2	frames/00072.png
-7.3	frames/00073.png
+7.3 frames/00073.png
 7.4	frames/00074.png
 7.5	frames/00075.png
 7.6	frames/00076.png

@@ -15,7 +15,7 @@ docker run --privileged --name orb-3-container \
 ```
 
 Run the code:
-
+<!-- path_to_sequence -->
 ```bash
-./Examples/Monocular/mono_tum Vocabulary/ORBvoc.txt 
+./Examples/Monocular/mono_tum Vocabulary/ORBvoc.txt /dpds/data/orbslam3/dji.yaml /dpds/data/run1/ 
 ```

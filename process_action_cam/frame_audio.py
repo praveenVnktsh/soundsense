@@ -45,7 +45,7 @@ if save_video:
 # get total number of images
 tot_images = len(os.listdir(frame_dir))
 
-with open(root + run_id + 'timestamps.txt', 'w') as f:
+with open(root + run_id + 'rgb.txt', 'w') as f:
     for i in range(tot_images):
         f.write(str(i/freq_rate) + '\tframes/' + str(i).zfill(leading_zeros) + '.png' + '\n')
 
