@@ -4,15 +4,18 @@
 #--------------------------------------------------------------------------------------------
 
 # Camera calibration and distortion parameters (OpenCV) 
-Camera.fx: 300
-Camera.fy: 300
-Camera.cx: 300
-Camera.cy: 300
+Camera.type: "KannalaBrandt8"
+Camera.fx: 517.306408
+Camera.fy: 516.469215
+Camera.cx: 318.643040
+Camera.cy: 255.313989
 
-Camera.k1: -.2251
-Camera.k2: .081888
-Camera.k3: -.0006011
-Camera.k4: .000579
+Camera.k1: 0.0
+Camera.k2: -0.0
+Camera.p1: -0.0
+Camera.p2: 0.0
+Camera.k3: 0.0
+Camera.k4: 0.0
 
 # Camera frames per second 
 Camera.fps: 10
@@ -23,6 +26,8 @@ Camera.RGB: 1
 Camera.width: 720 
 Camera.height: 1280
 
+# Camera.width: 640
+# Camera.height: 480
 #--------------------------------------------------------------------------------------------
 # ORB Parameters
 #--------------------------------------------------------------------------------------------

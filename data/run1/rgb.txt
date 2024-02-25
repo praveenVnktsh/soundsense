@@ -1,4 +1,3 @@
-0.0	frames/00000.png
 0.1	frames/00001.png
 0.2	frames/00002.png
 0.3	frames/00003.png
