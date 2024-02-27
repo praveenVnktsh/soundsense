@@ -2,6 +2,14 @@ import cv2
 import numpy as np
 import cv2.aruco as aruco
 import pyrealsense2 as rs
+import wave
+import pyaudio
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 48000
+CHUNK = 8192
+WAVE_OUTPUT_FILENAME = "file.wav"
+
 
 def my_estimatePoseSingleMarkers(corners, marker_size, mtx, distortion):
     '''
@@ -51,6 +59,16 @@ class ArucoDetector:
 
         self.distortion = np.array(self.intrinsics.coeffs)
         self.cap = cv2.VideoCapture(8)
+        self.audio = pyaudio.PyAudio()
+        self.stream = self.audio.open(format=FORMAT, channels=CHANNELS,
+                rate=RATE, input=True,
+                frames_per_buffer=CHUNK,
+                    input_device_index=5
+            )
+        
+        self.audio_frames = []
+
+        
     def capture_image(self):
         ret, img = self.cap.read()
         # Capture a single frame from the camera
@@ -59,6 +77,8 @@ class ArucoDetector:
         image = np.asanyarray(color_frame.get_data())
         cv2.imshow('frame', image)
         cv2.imshow('frame2', img)
+        data = self.stream.read(CHUNK)
+        self.audio_frames.append(data)
         return image
 
     def detect_aruco(self, image):
@@ -124,5 +144,14 @@ if __name__ == "__main__":
         
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
+            aruco_detector.stream.stop_stream()
+            aruco_detector.stream.close()
+            waveFile = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+            waveFile.setnchannels(CHANNELS)
+            waveFile.setsampwidth(aruco_detector.audio.get_sample_size(FORMAT))
+            waveFile.setframerate(RATE)
+            print(len(aruco_detector.audio_frames))
+            waveFile.writeframes(b''.join(aruco_detector.audio_frames))
+            waveFile.close()
             break
 
