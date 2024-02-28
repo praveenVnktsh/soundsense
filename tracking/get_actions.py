@@ -140,10 +140,11 @@ while True:
 
                 delp = tvec - avg_tvec
                 delx, dely, delz = delp
+                print(delx)
 
                 center = (640, 360)
                 if abs(delz) > 0.003:
-                    length = int(100 * abs(delz) / 0.003)
+                    length = int(100 * abs(delz) / 0.01)
                     
                     if delz < 0:
                         cv2.arrowedLine(lframe, center, (center[0], center[1] + length) , (0, 255, 0), 2)
@@ -159,7 +160,7 @@ while True:
                         
 
                 if abs(delx) > 0.003:
-                    length = int(100 * abs(delx) / 0.003)
+                    length = int(100 * abs(delx) / 0.01)
                     if delx < 0:
                         cv2.arrowedLine(lframe, center, (center[0] - length, center[1]) , (0, 0, 255), 2)
                     else:
@@ -170,25 +171,14 @@ while True:
                 prev_rpy = R.from_rotvec(center_link_poses[1][-2]).as_euler('zyx', degrees=False)
                 cur_yaw = np.mod(rpy[0] + np.pi, 2 * np.pi) - np.pi
                 prev_yaw = np.mod(prev_rpy[0] + np.pi, 2 * np.pi) - np.pi
-                
                 del_yaw = cur_yaw - prev_yaw
-                print(del_yaw)
-                
-                
-                if abs(del_yaw) > 0.:
+                if abs(del_yaw) > 0.01:
                     if del_yaw < 0:
                         cv2.ellipse(lframe, center, (100, 100), 0, 0, 80, (0, 0, 0), thickness=2)
                         cv2.arrowedLine(lframe, (740, 360), (740, 310), (0, 0, 0), thickness=2, tipLength=0.5)
                     else:
                         cv2.ellipse(lframe, center, (100, 100), 0, 0, 90, (0, 0, 0), thickness=2)
                         cv2.arrowedLine(lframe, (640, 460), (600, 460), (0, 0, 0), thickness=2, tipLength=0.5)
-
-
-
-            
-
-
-
 
         cv2.aruco.drawDetectedMarkers(rframe, corners, ids)
 
