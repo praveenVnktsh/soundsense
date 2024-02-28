@@ -34,6 +34,59 @@ def my_estimatePoseSingleMarkers(corners, marker_size, mtx, distortion,):
     return rvecs, tvecs, mats
 
 
+def track_and_reestimate(frames, poses, is_track, frame_idx):
+    parameter_lucas_kanade = dict(winSize=(15, 15), maxLevel=2, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+    for j in range(is_track[aruco_id][1], frame_idx):
+        alpha = (j - last_seen_idx) / (frame_idx - last_seen_idx)
+
+        new_points, status, errors = cv2.calcOpticalFlowPyrLK(frame_gray_init, frame_gray, old_points, None,
+                                                            **parameter_lucas_kanade)
+
+
+        tvec = (1 - alpha) * prev_seen_tvec + alpha * cur_tvec
+        rvec = cur_rvec
+        mat = np.eye(4)
+        rot_mat = cv2.Rodrigues(rvec)[0]
+        mat[:3, :3] = rot_mat
+        mat[:3, 3] = tvec.squeeze()
+        try:
+            poses[aruco_id][j] = {
+                'rvec' : rvec,
+                'tvec' : tvec,
+                'mat' : mat,
+                'id_in_ground_frame' : np.linalg.inv(ground_frame) @ mat
+            }
+        except:
+            print(j, last_seen_idx, frame_idx, aruco_id, poses.keys(), len(poses[aruco_id]))
+            exit()
+    while True:
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        if selected_point is True:
+            cv2.circle(frame, point, 5, (0, 0, 255), 2)
+            # update object corners by comparing with found edges in initial frame
+            
+            # overwrite initial frame with current before restarting the loop
+            frame_gray_init = frame_gray.copy()
+            # update to new edges before restarting the loop
+            old_points = new_points
+
+            x, y = new_points.ravel()
+            j, k = old_points.ravel()
+
+            # draw line between old and new corner point with random colour
+            canvas = cv2.line(canvas, (int(x), int(y)), (int(j), int(k)), (0, 255, 0), 3)
+            # draw circle around new position
+            frame = cv2.circle(frame, (int(x), int(y)), 5, (0, 255, 0), -1)
+
+        result = cv2.add(frame, canvas)
+        cv2.imshow('Optical Flow', result)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+
+
 rigid_transform_to_center = np.array(
     [
         [1, 0, 0, 0.025],
@@ -52,7 +105,7 @@ parameters = cv2.aruco.DetectorParameters()
 detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 
 # Set up your video source (webcam or video file)
-cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/4.mp4')  # Use 0 for webcam
+cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/3.mp4')  # Use 0 for webcam
     
 with open('realsense_calib.json', 'r') as f:
     calibration_data = json.load(f)
@@ -121,6 +174,7 @@ while True:
     lframes.append(lframe)
     rframes.append(rframe)
     gray = cv2.cvtColor(rframe, cv2.COLOR_BGR2GRAY)
+    # gray = cv2.medianBlur(gray, 3)
     corners, ids, rejected = detector.detectMarkers(gray)
     rvecs, tvecs, mats = my_estimatePoseSingleMarkers(corners, 0.025, mtx, dist)
     for i in range(4):
@@ -181,10 +235,10 @@ while True:
                         print(j, last_seen_idx, frame_idx, aruco_id, poses.keys(), len(poses[aruco_id]))
                         exit()
 
-                    cv2.drawFrameAxes(rframes[j], mtx, dist, rvec, tvec, length=0.03) 
-                    cv2.imshow('frame1', rframes[j])
-                    if cv2.waitKey(1) == ord('q'):
-                        exit()
+                    # cv2.drawFrameAxes(rframes[j], mtx, dist, rvec, tvec, length=0.03) 
+                    # cv2.imshow('frame1', rframes[j])
+                    # if cv2.waitKey(1) == ord('q'):
+                    #     exit()
     for k, v in cur_frame_track.items():
         if v == False:
             is_track[k] = (False, is_track[k][1])
@@ -204,14 +258,15 @@ while True:
 rvec = None
 tvec = None
 for i in range(len(lframes)):
-    if poses[3][i] is not None:
-        rvec = poses[3][i]['rvec']
-        tvec = poses[3][i]['tvec']
-    if rvec is  None or tvec is  None:
-        continue
-    rframe = rframes[i]
-    lframe = lframes[i]
-    cv2.drawFrameAxes(rframe, mtx, dist, rvec, tvec, length=0.03) 
+    for aruco_id in range(4):
+        if poses[aruco_id][i] is not None:
+            rvec = poses[aruco_id][i]['rvec']
+            tvec = poses[aruco_id][i]['tvec']
+        if rvec is  None or tvec is  None:
+            continue
+        rframe = rframes[i]
+        lframe = lframes[i]
+        cv2.drawFrameAxes(rframe, mtx, dist, rvec, tvec, length=0.03) 
     fr = np.hstack([rframe, lframe])
     fr = cv2.resize(fr, (0, 0), fx = 0.75, fy = 0.75)
     cv2.imshow('frame', fr)
