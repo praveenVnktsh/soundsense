@@ -4,7 +4,7 @@ import json
 from scipy.spatial.transform import Rotation as R
 # Specify the ArUco dictionary to use
 
-def my_estimatePoseSingleMarkers(corners, marker_size, mtx, distortion):
+def my_estimatePoseSingleMarkers(corners, marker_size, mtx, distortion, transform_frame):
     '''
     This will estimate the rvec and tvec for each of the marker corners detected by:
        corners, ids, rejectedImgPoints = detector.detectMarkers(image)
@@ -24,6 +24,13 @@ def my_estimatePoseSingleMarkers(corners, marker_size, mtx, distortion):
     
     for c in corners:
         nada, R, t = cv2.solvePnP(marker_points, c, mtx, distortion, False, cv2.SOLVEPNP_IPPE_SQUARE)
+        rot_mat = cv2.Rodrigues(R)[0]
+        mat = np.eye(4)
+        mat[:3, :3] = rot_mat
+        mat[:3, 3] = t.squeeze()
+        mat = transform_frame @ mat
+        R = cv2.Rodrigues(mat[:3, :3])[0]
+        t = mat[:3, 3]
         rvecs.append(R)
         tvecs.append(t)
         trash.append(nada)
@@ -72,22 +79,25 @@ relpose = {
     'gripper' : 0.0,
 }
 calib_frame = np.eye(4)
-transform_from_camera_to_gripper_center = np.eye(4)
+
 k = 0
 thresholds = {
-    'yaw' : 0.03
+    'yaw' : 0.2
 }
 actions = [
     # lift, extension, lateral, roll, gripper
     (0, 0, 0, 0, 0)
 ]
+
 avg_tvecs = []
+rpys = []
+prevgripper = 0
 while True:
     ret, frame = cap.read()
     
     k += 1
-    # if k % 5 != 0:
-    #     continue
+    if k % 1 != 0:
+        continue
     if not ret:
         break
     rframe = frame[:, :1280]
@@ -99,94 +109,167 @@ while True:
     action = [0, 0, 0, 0, 0]
     # Detect markers
     corners, ids, rejected = detector.detectMarkers(gray)
+    
     if ids is not None:  # Check if markers were found
         # Estimate pose of each marker
-        rvecs, tvecs, _ = my_estimatePoseSingleMarkers(corners, 0.025, mtx, dist)
+        if k == 1:
+            id_calib = 2
+            new_ids = ids.squeeze()
+            idx = np.where(new_ids == id_calib)[0][0]
+
+            rvecs, tvecs, _ = my_estimatePoseSingleMarkers(corners, 0.025, mtx, dist, np.eye(4))
+            calib_frame[:3, :3] = R.from_rotvec(rvecs[idx].squeeze()).as_matrix()
+            calib_frame[:3, 3] = tvecs[idx]
+            print(calib_frame)
+            # exit()
+
+
+        rvecs, tvecs, _ = my_estimatePoseSingleMarkers(corners, 0.025, mtx, dist, calib_frame)
         cv2.aruco.drawDetectedMarkers(rframe, corners, ids)
+
+        sum_rpy = np.array([0, 0, 0], dtype = np.float64)
+        zero_vec = np.array([0, 0, 0], dtype = np.float64)
+        one_vec = np.array([1, 1, 1], dtype = np.float64)
         for i in range(len(ids)):
             id = ids[i][0]
             rvec = rvecs[i].squeeze()
             tvec = tvecs[i].squeeze()
-            if id == 3: # camera_center
-                # check if rotation
-                curx, cury, curz = tvec
-                # prevx, prevy, prevz = prevpose[id]['tvec']
-                avg_tvecs.append(tvec)
-                if len(avg_tvecs) > 30:
-                    avg_tvecs.pop(0)
-                else:
-                    continue
+            if id == 2:
+                calib_frame = np.eye(4)
+                calib_frame[:3, :3] = R.from_rotvec(rvec).as_matrix()
+                calib_frame[:3, 3] = tvec
                 
-                mean_tvec = np.mean(avg_tvecs, axis=0)
-                prevx, prevy, prevz = mean_tvec
+            if id in [3, 0, 1]:
+                sum_rpy += R.from_rotvec(rvec).as_euler('zyx', degrees=False)
+            if id == 0:
+                zero_vec = tvec.copy()
+            if id == 1:
+                one_vec = tvec.copy()
 
-                delx = curx - prevx
-                dely = cury - prevy
-                delz = curz - prevz
-
-                print(dely)
-                # print(tvec)
-
-                cur_rpy = R.from_rotvec(rvec).as_euler('zyx', degrees=False)
-                prev_rpy = R.from_rotvec(prevpose[id]['rvec']).as_euler('zyx', degrees=False)
-                cur_yaw = cur_rpy[0]
-                prev_yaw = prev_rpy[0]
-                prevpose[id]['rvec'] = rvec.copy()
-                prevpose[id]['tvec'] = tvec.copy()
-
-                if abs(cur_yaw - prev_yaw) > thresholds['yaw']:
-                    action[3] = cur_yaw - prev_yaw
-                    actions.append(action)
-                    if cur_yaw > prev_yaw:
-                        cv2.arrowedLine(lframe,  (400, 400), (500, 500),(0, 255, 255), 2)
-                    else:
-                        cv2.arrowedLine(lframe, (600, 500), (550, 400) , (0, 255, 255), 2)
-                    continue
-                if abs(delz) > 0.02:
-                    action[0] = delz
-                    actions.append(action)
-                    if delz > 0:
-                        cv2.circle(lframe, (640, 360), 50, (0, 255, 0), 2)
-                    else:
-                        cv2.circle(lframe, (640, 360), 50, (0, 255, 0), -1)
-                    continue
-                if abs(delx) > 0.01:
-                    action[2] = delx
-               
-                    actions.append(action)
-                    if delx > 0:
-                        cv2.arrowedLine(lframe,  (640, 360), (540, 360),(0, 255, 255), 2)
-                    else:
-                        cv2.arrowedLine(lframe, (640, 360), (740, 360) , (0, 255, 255), 2)
-                    continue
-                
-                
-
-                if abs(dely) > 0.01:
-                    action[1] = dely
-                    # action = (
-                    #     0, cury - prevy, 0, 0, 0
-                    # )
-                    actions.append(action)
-                    if dely > 0:
-                        cv2.arrowedLine(lframe, (640, 360), (640, 460) , (0, 255, 255), 2)
-                    else:
-                        cv2.arrowedLine(lframe,  (640, 360), (640, 260),(0, 255, 255), 2)
-                    continue
-                    
-                # print(delz)
-
-            curpose[id] = {
-                'rvec' : rvec,
-                'tvec' : tvec 
-            }
-
-            relpose[id] = {
-                'rvec' : rvec ,
-                'tvec' : tvec 
-            }
+        gripper = np.linalg.norm(one_vec - zero_vec)
+        # print(gripper, prevgripper)
+        if abs(gripper - prevgripper) > 0.03:
+            action[4] = gripper - prevgripper
+            actions.append(action)
+            if gripper > prevgripper:
+                cv2.arrowedLine(lframe,  (540, 360), (640, 360),(0, 255, 255), 2)
+                cv2.arrowedLine(lframe,  (740, 360), (640, 360),(0, 255, 255), 2)
+            else:
+                cv2.arrowedLine(lframe,  (640, 360), (740, 360),(0, 255, 255), 2)
+                cv2.arrowedLine(lframe,  (640, 360), (640, 360),(0, 255, 255), 2)
             
-            # print(relpose)
+        prevgripper = gripper
+            # continue
+
+        cur_rpy = sum_rpy / len(ids)
+
+        rpys.append(cur_rpy)
+        if len(rpys) > 15:
+            rpys.pop(0)
+        else:
+            continue
+        mean_rpy = np.mean(rpys, axis=0)
+        cur_yaw = cur_rpy[0]
+        prev_yaw = mean_rpy[0]
+        if abs(cur_yaw - prev_yaw) > thresholds['yaw']:
+            action[3] = cur_yaw - prev_yaw
+            actions.append(action)
+            if cur_yaw > prev_yaw:
+                cv2.arrowedLine(lframe,  (400, 400), (500, 500),(0, 255, 255), 2)
+            else:
+                cv2.arrowedLine(lframe, (600, 500), (550, 400) , (0, 255, 255), 2)
+            # continue
+
+                
+        
+        if action[3] != 0:
+            
+            for i in range(len(ids)):
+                id = ids[i][0]
+                rvec = rvecs[i].squeeze()
+                tvec = tvecs[i].squeeze()
+
+
+                if id == 3: # camera_center
+                    # check if rotation
+                    curx, cury, curz = tvec
+                    avg_tvecs.append(tvec)
+                    if len(avg_tvecs) > 5:
+                        avg_tvecs.pop(0)
+                    else:
+                        continue
+                    
+                    mean_tvec = np.mean(avg_tvecs, axis=0)
+                    prevx, prevy, prevz = mean_tvec
+
+                    delx = curx - prevx
+                    dely = cury - prevy
+                    delz = curz - prevz
+
+                    print(dely)
+                    # print(tvec)
+
+                    # cur_rpy = R.from_rotvec(rvec).as_euler('zyx', degrees=False)
+                    # prev_rpy = R.from_rotvec(prevpose[id]['rvec']).as_euler('zyx', degrees=False)
+                    # cur_yaw = cur_rpy[0]
+                    # prev_yaw = prev_rpy[0]
+                    # prevpose[id]['rvec'] = rvec.copy()
+                    # prevpose[id]['tvec'] = tvec.copy()
+
+                    # if abs(cur_yaw - prev_yaw) > thresholds['yaw']:
+                    #     action[3] = cur_yaw - prev_yaw
+                    #     actions.append(action)
+                    #     if cur_yaw > prev_yaw:
+                    #         cv2.arrowedLine(lframe,  (400, 400), (500, 500),(0, 255, 255), 2)
+                    #     else:
+                    #         cv2.arrowedLine(lframe, (600, 500), (550, 400) , (0, 255, 255), 2)
+                    #     continue
+                    # if abs(delz) > 0.02:
+                    #     action[0] = delz
+                    #     actions.append(action)
+                    #     if delz > 0:
+                    #         cv2.circle(lframe, (640, 360), 50, (0, 255, 0), 2)
+                    #     else:
+                    #         cv2.circle(lframe, (640, 360), 50, (0, 255, 0), -1)
+                    #     # continue
+                    
+                    # if abs(delx) > 0.01:
+                    #     action[2] = delx
+                
+                    #     actions.append(action)
+                    #     if delx > 0:
+                    #         cv2.arrowedLine(lframe,  (640, 360), (540, 360),(0, 255, 255), 2)
+                    #     else:
+                    #         cv2.arrowedLine(lframe, (640, 360), (740, 360) , (0, 255, 255), 2)
+                    #     # continue
+                    
+                    
+
+                    # if abs(dely) > 0.01:
+                    #     action[1] = dely
+                    #     # action = (
+                    #     #     0, cury - prevy, 0, 0, 0
+                    #     # )
+                    #     actions.append(action)
+                    #     if dely > 0:
+                    #         cv2.arrowedLine(lframe, (640, 360), (640, 460) , (0, 255, 255), 2)
+                    #     else:
+                    #         cv2.arrowedLine(lframe,  (640, 360), (640, 260),(0, 255, 255), 2)
+                        # continue
+                        
+                    # print(delz)
+
+                # curpose[id] = {
+                #     'rvec' : rvec,
+                #     'tvec' : tvec 
+                # }
+
+                # relpose[id] = {
+                #     'rvec' : rvec ,
+                #     'tvec' : tvec 
+                # }
+                
+                # print(relpose)
 
         # rotation_matrix, _ = cv2.Rodrigues(rvec)
         # translation_vector = tvec.reshape((3, 1))
@@ -194,7 +277,7 @@ while True:
 
     cv2.imshow('frame', rframe)
     cv2.imshow('fram1e', lframe)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(500) & 0xFF == ord('q'):
         break
 
 with open('actions.json', 'w') as f:
