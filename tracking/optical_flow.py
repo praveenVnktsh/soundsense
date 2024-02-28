@@ -8,6 +8,7 @@ def select_point(event, x, y, flags, params):
         point = (x, y)
         selected_point = True
         old_points = np.array([[x, y]], dtype=np.float32)
+        print('Point selected', point)
 
 
 # associate select function with window Selector
@@ -20,6 +21,7 @@ parameters_shitomasi = dict(maxCorners=100, qualityLevel=0.2, minDistance=7)
 # get first video frame
 ok, frame = cap.read() 
 # initialize variables updated by function
+frame = frame[:, 1280:]
 selected_point = False
 point = ()
 old_points = ([[]])
@@ -35,6 +37,7 @@ while True:
         continue
     # get next frame
     ok, frame = cap.read()
+    frame = frame[:, 1280:]
     # covert to grayscale
     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 

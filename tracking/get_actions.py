@@ -113,7 +113,6 @@ while True:
                 ground_frame = mats[i]
             rvec = rvecs[i]
             tvec = tvecs[i]
-            # cv2.drawFrameAxes(rframe, mtx, dist, rvec, tvec, length=0.03 )
             id_in_ground_frame = np.linalg.inv(ground_frame) @ mats[i]
             cv2.drawFrameAxes(rframe, mtx, dist, rvec, tvec, length=0.03 ) 
             if aruco_id == 3:
