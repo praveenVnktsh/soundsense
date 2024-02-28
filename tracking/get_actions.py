@@ -52,7 +52,7 @@ parameters = cv2.aruco.DetectorParameters()
 detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 
 # Set up your video source (webcam or video file)
-cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/1.mp4')  # Use 0 for webcam
+cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/4.mp4')  # Use 0 for webcam
     
 with open('realsense_calib.json', 'r') as f:
     calibration_data = json.load(f)
@@ -181,9 +181,10 @@ while True:
                         cv2.arrowedLine(lframe, (640, 460), (600, 460), (0, 0, 0), thickness=2, tipLength=0.5)
 
         cv2.aruco.drawDetectedMarkers(rframe, corners, ids)
-
-    cv2.imshow('frame', rframe)
-    cv2.imshow('fram1e', lframe)
+    fr = np.hstack([rframe, lframe])
+    fr = cv2.resize(fr, (0, 0), fx = 0.75, fy = 0.75)
+    cv2.imshow('frame', fr)
+    
     if cv2.waitKey(50) & 0xFF == ord('q'):
         break
 
@@ -193,3 +194,9 @@ with open('actions.json', 'w') as f:
 # Release resources
 cap.release()
 cv2.destroyAllWindows()
+
+
+# TODO
+# 1. Add gripper width estimation 
+# 2. Handle loss of tracking using redundancy estimation and interpolation / backfilling of frames. (each frame must have an action estimate for each dimenision as relative pose.)
+# 3. 
