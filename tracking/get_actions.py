@@ -31,9 +31,18 @@ def my_estimatePoseSingleMarkers(corners, marker_size, mtx, distortion,):
         mats.append(mat)
         rvecs.append(R)
         tvecs.append(t)
-
-
     return rvecs, tvecs, mats
+
+
+rigid_transform_to_center = np.array(
+    [
+        [1, 0, 0, 0.025],
+        [0, 1, 0, -0.07],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ]
+)
+
 
 
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
@@ -73,6 +82,11 @@ actions = [
     (0, 0, 0, 0, 0)
 ]
 
+center_link_poses = [
+    [],
+    []
+]
+
 avg_tvecs = []
 rpys = []
 prevgripper = 0
@@ -92,27 +106,94 @@ while True:
     if ids is not None:  # Check if markers were found
         # if k == 1:
         rvecs, tvecs, mats = my_estimatePoseSingleMarkers(corners, 0.025, mtx, dist)
-        print(len(ids), len(rvecs))
+        # print(len(ids), len(rvecs))
         for i in range(len(ids)):
             aruco_id = ids[i][0]
             if aruco_id == 2:
                 ground_frame = mats[i]
-            try:
-                id_in_ground_frame = np.linalg.inv(ground_frame) @ mats[i]
-            except:
-                print(aruco_id)
+            rvec = rvecs[i]
+            tvec = tvecs[i]
+            # cv2.drawFrameAxes(rframe, mtx, dist, rvec, tvec, length=0.03 )
+            id_in_ground_frame = np.linalg.inv(ground_frame) @ mats[i]
+            cv2.drawFrameAxes(rframe, mtx, dist, rvec, tvec, length=0.03 ) 
             if aruco_id == 3:
-                # print(id_in_ground_frame)
-                tvec = id_in_ground_frame[:3, 3]
-                rpy = R.from_matrix(id_in_ground_frame[:3, :3]).as_euler('xyz')
-                tvec = np.round(tvec, 3)
-                print(tvec)
+                center_link =  mats[i] @ rigid_transform_to_center
+                rvec = R.from_matrix(center_link[:3, :3]).as_rotvec()
+                tvec_in_cam = center_link[:3, 3]
+                cv2.drawFrameAxes(rframe, mtx, dist, rvec, tvec_in_cam, length=0.03 )
+                center_link_in_ground = np.linalg.inv(ground_frame) @ center_link
+                tvec = center_link_in_ground[:3, 3]
+                rvec = R.from_matrix(center_link_in_ground[:3, :3]).as_rotvec()
+                # print(tvec)
+                
+                center_link_poses[0].append(tvec)
+                center_link_poses[1].append(rvec)
+
+                if len(center_link_poses[0]) > 10:
+                    center_link_poses[0].pop(0)
+                    center_link_poses[1].pop(0)
+                else:
+                    continue
+
+                avg_tvec = np.mean(center_link_poses[0], axis=0)
+
+
+                delp = tvec - avg_tvec
+                delx, dely, delz = delp
+
+                center = (640, 360)
+                if abs(delz) > 0.003:
+                    length = int(100 * abs(delz) / 0.003)
+                    
+                    if delz < 0:
+                        cv2.arrowedLine(lframe, center, (center[0], center[1] + length) , (0, 255, 0), 2)
+                    else:
+                        cv2.arrowedLine(lframe,  center, (center[0], center[1] - length),(0, 255, 0), 2)
+
+                if abs(dely) > 0.003:
+                    col = int (255 * abs(dely) / 0.1 + 128)
+                    if dely < 0:
+                        cv2.circle(lframe, center, 30, (0, col, 0), -1)
+                    else:
+                        cv2.circle(lframe, center, 30, (0, 0, col), -1)
+                        
+
+                if abs(delx) > 0.003:
+                    length = int(100 * abs(delx) / 0.003)
+                    if delx < 0:
+                        cv2.arrowedLine(lframe, center, (center[0] - length, center[1]) , (0, 0, 255), 2)
+                    else:
+                        cv2.arrowedLine(lframe,  center, (center[0] + length, center[1]),(0, 0, 255), 2)
+
+
+                rpy = R.from_rotvec(rvec).as_euler('zyx', degrees=False)
+                prev_rpy = R.from_rotvec(center_link_poses[1][-2]).as_euler('zyx', degrees=False)
+                cur_yaw = np.mod(rpy[0] + np.pi, 2 * np.pi) - np.pi
+                prev_yaw = np.mod(prev_rpy[0] + np.pi, 2 * np.pi) - np.pi
+                
+                del_yaw = cur_yaw - prev_yaw
+                print(del_yaw)
+                
+                
+                if abs(del_yaw) > 0.:
+                    if del_yaw < 0:
+                        cv2.ellipse(lframe, center, (100, 100), 0, 0, 80, (0, 0, 0), thickness=2)
+                        cv2.arrowedLine(lframe, (740, 360), (740, 310), (0, 0, 0), thickness=2, tipLength=0.5)
+                    else:
+                        cv2.ellipse(lframe, center, (100, 100), 0, 0, 90, (0, 0, 0), thickness=2)
+                        cv2.arrowedLine(lframe, (640, 460), (600, 460), (0, 0, 0), thickness=2, tipLength=0.5)
+
+
+
+            
+
+
 
 
         cv2.aruco.drawDetectedMarkers(rframe, corners, ids)
 
-    cv2.imshow('fram1e', lframe)
     cv2.imshow('frame', rframe)
+    cv2.imshow('fram1e', lframe)
     if cv2.waitKey(50) & 0xFF == ord('q'):
         break
 
