@@ -75,7 +75,7 @@ calib_frame = np.eye(4)
 transform_from_camera_to_gripper_center = np.eye(4)
 k = 0
 thresholds = {
-    'yaw' : 0.1
+    'yaw' : 0.03
 }
 actions = [
     # lift, extension, lateral, roll, gripper
@@ -96,8 +96,7 @@ while True:
 
     # Convert to grayscale for ArUco detection
     gray = cv2.cvtColor(rframe, cv2.COLOR_BGR2GRAY)
-    
-
+    action = [0, 0, 0, 0, 0]
     # Detect markers
     corners, ids, rejected = detector.detectMarkers(gray)
     if ids is not None:  # Check if markers were found
@@ -113,7 +112,7 @@ while True:
                 curx, cury, curz = tvec
                 # prevx, prevy, prevz = prevpose[id]['tvec']
                 avg_tvecs.append(tvec)
-                if len(avg_tvecs) > 20:
+                if len(avg_tvecs) > 30:
                     avg_tvecs.pop(0)
                 else:
                     continue
@@ -136,9 +135,7 @@ while True:
                 prevpose[id]['tvec'] = tvec.copy()
 
                 if abs(cur_yaw - prev_yaw) > thresholds['yaw']:
-                    action = (
-                        0, 0, 0, cur_yaw - prev_yaw, 0
-                    )
+                    action[3] = cur_yaw - prev_yaw
                     actions.append(action)
                     if cur_yaw > prev_yaw:
                         cv2.arrowedLine(lframe,  (400, 400), (500, 500),(0, 255, 255), 2)
@@ -146,9 +143,7 @@ while True:
                         cv2.arrowedLine(lframe, (600, 500), (550, 400) , (0, 255, 255), 2)
                     continue
                 if abs(delz) > 0.02:
-                    action = (
-                        curz - prevz, 0, 0, 0, 0
-                    )
+                    action[0] = delz
                     actions.append(action)
                     if delz > 0:
                         cv2.circle(lframe, (640, 360), 50, (0, 255, 0), 2)
@@ -156,9 +151,8 @@ while True:
                         cv2.circle(lframe, (640, 360), 50, (0, 255, 0), -1)
                     continue
                 if abs(delx) > 0.01:
-                    action = (
-                        0, 0, curx - prevx, 0, 0
-                    )
+                    action[2] = delx
+               
                     actions.append(action)
                     if delx > 0:
                         cv2.arrowedLine(lframe,  (640, 360), (540, 360),(0, 255, 255), 2)
@@ -169,9 +163,10 @@ while True:
                 
 
                 if abs(dely) > 0.01:
-                    action = (
-                        0, cury - prevy, 0, 0, 0
-                    )
+                    action[1] = dely
+                    # action = (
+                    #     0, cury - prevy, 0, 0, 0
+                    # )
                     actions.append(action)
                     if dely > 0:
                         cv2.arrowedLine(lframe, (640, 360), (640, 460) , (0, 255, 255), 2)
@@ -201,6 +196,9 @@ while True:
     cv2.imshow('fram1e', lframe)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+
+with open('actions.json', 'w') as f:
+    json.dump(actions, f)
 
 # Release resources
 cap.release()
