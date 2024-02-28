@@ -57,20 +57,6 @@ dist = np.array(dist)
 # 1 is the id of the right gripper.
 # 2 is the global coordinate frame.
 ids_care = [0, 1, 2, 3]
-curpose = {
-    0 : {'rvec' : [0, 0, 0], 'tvec' : [0, 0, 0]},
-    1 : {'rvec' : [0, 0, 0], 'tvec' : [0, 0, 0]},
-    2 : {'rvec' : [0, 0, 0], 'tvec' : [0, 0, 0]},
-    3 : {'rvec' : [0, 0, 0], 'tvec' : [0, 0, 0]},
-}
-
-prevpose = {
-    0 : {'rvec' : [0, 0, 0], 'tvec' : [0, 0, 0]},
-    1 : {'rvec' : [0, 0, 0], 'tvec' : [0, 0, 0]},
-    2 : {'rvec' : [0, 0, 0], 'tvec' : [0, 0, 0]},
-    3 : {'rvec' : [0, 0, 0], 'tvec' : [0, 0, 0]},
-}
-
 relpose = {
     'lift' : 0.0,
     'extension' : 0.0,
@@ -79,7 +65,6 @@ relpose = {
     'gripper' : 0.0,
 }
 calib_frame = np.eye(4)
-
 k = 0
 thresholds = {
     'yaw' : 0.2
@@ -121,12 +106,10 @@ while True:
             calib_frame[:3, :3] = R.from_rotvec(rvecs[idx].squeeze()).as_matrix()
             calib_frame[:3, 3] = tvecs[idx]
             print(calib_frame)
-            # exit()
-
+            continue
 
         rvecs, tvecs, _ = my_estimatePoseSingleMarkers(corners, 0.025, mtx, dist, calib_frame)
         cv2.aruco.drawDetectedMarkers(rframe, corners, ids)
-
         sum_rpy = np.array([0, 0, 0], dtype = np.float64)
         zero_vec = np.array([0, 0, 0], dtype = np.float64)
         one_vec = np.array([1, 1, 1], dtype = np.float64)
@@ -147,7 +130,6 @@ while True:
                 one_vec = tvec.copy()
 
         gripper = np.linalg.norm(one_vec - zero_vec)
-        # print(gripper, prevgripper)
         if abs(gripper - prevgripper) > 0.03:
             action[4] = gripper - prevgripper
             actions.append(action)
