@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation as R
 
 
 # Set up your video source (webcam or video file)
-cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/3.mp4')  # Use 0 for webcam
+cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/1.mp4')  # Use 0 for webcam
     
 with open('realsense_calib.json', 'r') as f:
     calibration_data = json.load(f)
@@ -128,7 +128,7 @@ while True:
     cv2.circle(rframe, rmean.astype(int), 5, (0, 0, 255), -1)
     cv2.circle(rframe, lmean.astype(int), 5, (0, 0, 255), -1)
     dist = np.linalg.norm(rmean - lmean)
-    if dist > 300:
+    if dist > 290:
         actions.append(0)
         cv2.arrowedLine(rframe, (640, 360), (540, 360), (255, 255, 0), 2)
         cv2.arrowedLine(rframe, (640, 360), (740, 360), (255, 255, 0), 2)

@@ -15,7 +15,7 @@ def select_point(event, x, y, flags, params):
 cv2.namedWindow('Optical Flow')
 cv2.setMouseCallback('Optical Flow', select_point)
 
-cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/3.mp4')
+cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/4.mp4')
 parameters_shitomasi = dict(maxCorners=100, qualityLevel=0.2, minDistance=7)
 
 # get first video frame
