@@ -22,7 +22,7 @@ import torch
 
 import core.utils as utils
 from core.logger import Logger
-from core.replay_buffer_3 import ReplayBufferDoubleRewardEpisodes as ReplayBuffer
+from core.replay_buffer_audio_episode import ReplayBufferAudioEpisodes as ReplayAudioBuffer
 # from core.video import VideoRecorder
 
 from robosuite import make
@@ -114,6 +114,11 @@ class Workspace(object):
         # obj_dict, lowdim, obs = self.env.reset() #let's mold our model to what the environment outputs
         # cfg.agent.params.obs_shape = np.shape(obs)[1:]
         cfg.agent.params.obs_shape = (3, IMG_WIDTH, IMG_HEIGHT)            # TODO: Hardcoded for now
+        
+        cfg.encoder.params.audio_steps = 57
+        cfg.encoder.params.audio_bins = 160
+        cfg.encoder.params.audio_feature_dim = 10         # TODO: idk never used
+
 
         #obs is returned as [stack, 3, 84, 84]. We want [3, 84, 84]
         #batch comes first, so [batch, stack, 3, 84, 84]
@@ -234,7 +239,7 @@ class Workspace(object):
         self.agent.load(self.cfg.load_dir, prefix = self.cfg.actor_root)
         self.evaluate(episodes = 250)
 
-@hydra.main(config_path='train_real.yaml', strict=True)
+@hydra.main(config_path='train_real_audio.yaml', strict=True)
 def main(cfg):
     from train_real import Workspace as W
     workspace = W(cfg)

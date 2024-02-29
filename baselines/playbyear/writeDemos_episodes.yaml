@@ -31,10 +31,11 @@ modalities: [object_sound, robot0_eef_pos, robot0_gripper_qpos, robot0_gripper_q
 cameraName: agentview_image
 runName:  ${environmentName}_${episodes}
 stacked: true
+audio: false
 
 #Other hyperparameters
 episodeLength: 250 #150 for occluded block, 250 for pick place
-episodes: 50
+episodes: 1
 recordFrq: 10
 sparseProp: 0.75 #what proportion of rewards will be 0 (the rest will be 1)
 

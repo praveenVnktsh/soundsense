@@ -33,7 +33,8 @@ corrections_file: ${load_folder}/corrections/demos_finished.pkl #fill this in la
 
 #########################
 actor_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/Results/
-demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/dummy/
+# demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/dummy/
+demo_root: /home/punygod_admin/SoundSense/soundsense/data/run3/
 use_squashed: True #squashed vs not squashed distributions
 lowdim_stack: 10
 frame_stack: 3
@@ -41,9 +42,10 @@ system: sim #sim for the mujoco stuff, and "real" for franka
 
 #####RUN CHANGES HERE ############
 #core adjustements
-seed: 1
-number_demos: 50
-demo_file: ${environmentName}_${number_demos}/demos.pkl
+seed: 0
+number_demos: 1
+# demo_file: ${environmentName}_${number_demos}/demos.pkl
+demo_file: pbe_audio.pkl
 stack: 10 # history
 
 #misc training parameters
@@ -61,7 +63,7 @@ cameraName: agentview_image
 
 #logging
 # runName: ${load_folder}
-runName: ${environmentName}_${number_demos}_${seed}
+runName: audio_${number_demos}_${seed}
 #####CHANGES END HERE ##########
 
 
@@ -93,7 +95,8 @@ runName: ${environmentName}_${number_demos}_${seed}
 # agent configuration
 agent:
   name: drq
-  class: core.drq_memory.DRQAgent
+  class: core.drq_audio_memory.DRQAgent
+  # class: core.drq_memory.DRQAgent
   params:
     obs_shape: ??? # to be specified later
     action_shape: ??? # to be specified later
@@ -113,7 +116,7 @@ agent:
     log_frequency: 20
 
 critic:
-  class: core.drq_memory.Critic
+  class: core.drq_audio_memory.Critic
   params:
     encoder_cfg: ${agent.params.encoder_cfg}
     action_shape: ${agent.params.action_shape}
@@ -121,7 +124,8 @@ critic:
     hidden_depth: 2
 
 actor:
-  class: core.drq_memory.Actor
+  class: core.drq_audio_memory.Actor
+  # class: core.drq_memory.Actor
   params:
     encoder_cfg: ${agent.params.encoder_cfg}
     action_shape: ${agent.params.action_shape}
@@ -130,11 +134,15 @@ actor:
     log_std_bounds: [-6, -1]
 
 encoder:
-  class: core.drq_memory.Encoder
+  class: core.drq_audio_memory.Encoder
+  # class: core.drq_memory.Encoder
   params:
       obs_shape: ${agent.params.obs_shape}
       feature_dim: 50 #used to be 50
       lowdim_dim: ${agent.params.lowdim_dim}
+      audio_steps: 57
+      audio_bins: 160
+      audio_feature_dim: 10
       num_layers: 4
       num_filters: 32
       output_dim: 35
