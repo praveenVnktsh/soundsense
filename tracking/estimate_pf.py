@@ -3,7 +3,7 @@ import numpy as np
 import json
 from scipy.spatial.transform import Rotation as R
 # Specify the ArUco dictionary to use
-
+import sys
 class ParticleFilter():
 
     def __init__(self, centroid, num_particles = 100):
@@ -153,7 +153,8 @@ parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
 detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 
 # Set up your video source (webcam or video file)
-cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/4.mp4')  # Use 0 for webcam
+
+cap = cv2.VideoCapture(f'/home/praveen/dev/mmml/soundsense/data/videos/{sys.argv[1]}')  # Use 0 for webcam
     
 with open('realsense_calib.json', 'r') as f:
     calibration_data = json.load(f)
@@ -367,7 +368,7 @@ for i in range(0, len(lframes)):
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-with open('actions.json', 'w') as f:
+with open(sys.argv[2], 'w') as f:
     json.dump(actions, f)
 
 # Release resources

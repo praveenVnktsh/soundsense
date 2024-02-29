@@ -2,11 +2,12 @@ import cv2
 import numpy as np
 import json
 from scipy.spatial.transform import Rotation as R
+import sys
 # Specify the ArUco dictionary to use
 
 
 # Set up your video source (webcam or video file)
-cap = cv2.VideoCapture('/home/praveen/dev/mmml/soundsense/data/videos/1.mp4')  # Use 0 for webcam
+cap = cv2.VideoCapture(f'/home/praveen/dev/mmml/soundsense/data/videos/{sys.argv[1]}')  # Use 0 for webcam
     
 with open('realsense_calib.json', 'r') as f:
     calibration_data = json.load(f)
@@ -80,9 +81,9 @@ parameter_lucas_kanade = dict(winSize=(30, 30), maxLevel=10, criteria=(cv2.TERM_
 
 ret, frame = cap.read()
 frame = frame[:, 1280:]
-frame_idx = 1
+frame_idx = 0
 frame_gray_init = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-with open('actions.json', 'r') as f:
+with open(sys.argv[2], 'r') as f:
     actions = json.load(f)
 
 while True:
@@ -148,7 +149,7 @@ while True:
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-with open('actions.json', 'w') as f:
+with open(sys.argv[2], 'w') as f:
     json.dump(actions, f)
 
 # Release resources
