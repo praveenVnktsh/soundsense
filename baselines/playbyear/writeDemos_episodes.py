@@ -177,8 +177,6 @@ class Workspace(object):
             print("****** ADDED ****** and we are at ", self.replay_buffer.idx)
 
 
-
-
     def run(self, cfg):
         img_path = '/home/punygod_admin/SoundSense/soundsense/data/run3/frames'
         audio_path = '/home/punygod_admin/SoundSense/soundsense/data/run3/audio/audio.wav'

@@ -22,14 +22,14 @@ image_pad: 4
 use_lowdim: true
 
 #for save and loading
-demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/dummy/ # CHANGE THIS
+demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/hydralogs/ # CHANGE THIS
 system: sim
 stack: 1 #stack should be 1 for demo collection
 
 environmentName: IndicatorBoxBlock #IMPORTANT: this is the environment that is run
 modalities: [object_sound, robot0_eef_pos, robot0_gripper_qpos, robot0_gripper_qvel]
 cameraName: agentview_image
-runName:  ${environmentName}_${episodes}
+runName:  run_${episodes}
 stacked: true
 audio: false
 
