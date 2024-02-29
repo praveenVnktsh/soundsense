@@ -59,6 +59,15 @@ def my_estimatePoseSingleMarkers(corners, marker_size, mtx, distortion,):
     return rvecs, tvecs, mats
 
 
+
+def get_slope(i):
+    lgripper = poses[0][i]['particle_mean']
+    rgripper = poses[1][i]['particle_mean']
+
+    # slope = () / ()
+    angle = np.arctan2(rgripper[1] - lgripper[1], rgripper[0] - lgripper[0])
+    return angle
+
 def track_and_reestimate(frames, poses, is_track, frame_idx, aruco_id, viz_frames):
     start_frame = is_track[aruco_id][1]
     packet = poses[aruco_id][start_frame - 1]
@@ -77,18 +86,24 @@ def track_and_reestimate(frames, poses, is_track, frame_idx, aruco_id, viz_frame
         prev_frame = frames[i - 1]
         pf.update(frame, prev_frame)
         est = pf.estimate().squeeze()
+
+        
+        
         corners = np.array([
                 [est[0] - width / 2, est[1] - height / 2],
-                [est[0] - width / 2, est[1] + height / 2],
-                [est[0] + width / 2, est[1] + height / 2],
                 [est[0] + width / 2, est[1] - height / 2],
+                [est[0] + width / 2, est[1] + height / 2],
+                [est[0] - width / 2, est[1] + height / 2],
             ])
         rvecs, tvecs, mats = my_estimatePoseSingleMarkers([corners], 0.025, mtx, dist)
+
+        
         poses[aruco_id][i] = {
             'particle_mean' : est.astype(np.int32),
             'corners' : corners,
             'rvec' : rvecs[0],
             'tvec' : tvecs[0],
+            'filtered' : True,
         }
 
         viz_frame = viz_frames[i]
@@ -98,8 +113,6 @@ def track_and_reestimate(frames, poses, is_track, frame_idx, aruco_id, viz_frame
         cv2.circle(viz_frame, (int(est[0]), int(est[1])), 5, (0, 0, 255), -1)
 
     return poses
-
-
 
 rigid_transform_to_center = np.array(
     [
@@ -182,7 +195,8 @@ poses = {
     0 : [],
     1 : [],
     2 : [],
-    3 : []
+    3 : [],
+    'center_link' : []
 }
 is_track = {
     0 : (True, 0),
@@ -224,30 +238,33 @@ while True:
         cur_frame_track[aruco_id] = True
         if aruco_id > 3:
             continue
-        if aruco_id == 2 and frame_idx == 0:
-            ground_frame = mats[i]
-        id_in_ground_frame = np.linalg.inv(ground_frame) @ mats[i]
+        if aruco_id == 2 :
+            # if frame_idx == 0:
+            z_vector = mats[i][:3, 2]
+            ori = np.array([0, 1, 0]).dot(z_vector)
+            if ori < 0:
+                ground_frame = mats[i]
+            rvecs[i] = R.from_matrix(ground_frame[:3, :3]).as_rotvec()
+            tvecs[i] = ground_frame[:3, 3]
+
+        # id_in_ground_frame = np.linalg.inv(ground_frame) @ mats[i]
         center = np.mean(corners[i].squeeze(), axis=0)
         poses[aruco_id][-1] = {
             'rvec' : rvecs[i],
             'tvec' : tvecs[i],
             'mat' : mats[i],
-            'id_in_ground_frame' : id_in_ground_frame,
+            # 'id_in_ground_frame' : id_in_ground_frame,
             'corners' : corners[i],
-            'particle_mean' : center.astype(np.int32)
+            'particle_mean' : center.astype(np.int32),
+            'filtered' : False
         }
         cv2.circle(viz_frames[-1], (int(center[0]), int(center[1])), 5, (0, 255, 0), -1)
     
     for aruco_id in range(4):
-        if is_track[aruco_id][0] == False:
-            if cur_frame_track[aruco_id] == True:
-                last_seen_idx = is_track[aruco_id][1]
-                # cur_tvec = poses[aruco_id][-1]['tvec']
-                # prev_seen_tvec = poses[aruco_id][last_seen_idx]['tvec']
-                # cur_rvec = poses[aruco_id][-1]['rvec']
-                # prev_seen_rvec = poses[aruco_id][last_seen_idx]['rvec']
-                
-                poses = track_and_reestimate(rframes, poses, is_track, frame_idx, aruco_id, viz_frames)
+        if is_track[aruco_id][0] == False and cur_frame_track[aruco_id] == True:
+            last_seen_idx = is_track[aruco_id][1]
+            poses = track_and_reestimate(rframes, poses, is_track, frame_idx, aruco_id, viz_frames)
+
     for k, v in cur_frame_track.items():
         if v == False:
             is_track[k] = (False, is_track[k][1])
@@ -257,32 +274,97 @@ while True:
     frame_idx += 1
 print("REL POSE PHASE")
 
+actions = [
+    # lift, extension, lateral, roll, gripper
+    (0, 0, 0, 0, 0)
+]
 
-
-def get_slope(i):
-    lgripper = poses[0][i]['particle_mean']
-    rgripper = poses[1][i]['particle_mean']
-
-    slope = (rgripper[1] - lgripper[1]) / (rgripper[0] - lgripper[0])
-    angle = np.arctan(slope)
-    return angle
-
-
-for i in range(1, len(lframes)):
+difference_frames = 2
+for i in range(0, len(lframes)):
+    angle_cur = get_slope(i)
+    
+    
     for aruco_id in range(4):
-        # if poses[aruco_id][i] is None:
-        #     continue
         center = poses[aruco_id][i]['particle_mean']
         cv2.circle(viz_frames[i], (int(center[0]), int(center[1])), 5, (0, 0, 255), -1)
-        cv2.drawFrameAxes(viz_frames[i], mtx, dist, poses[aruco_id][i]['rvec'], poses[aruco_id][i]['tvec'], 0.025)
-    
-    angle_cur = get_slope(i)
-    angle_prev = get_slope(i - 10)
-    delta = angle_cur - angle_prev
+        if aruco_id == 3 and poses[aruco_id][i]['filtered']:
+            # if not poses[0][i]['filtered']:
+            #     rv = np.array([0, 0, poses[0][i]['rvec'][2]], dtype=np.float32)
+            # elif not poses[1][i]['filtered']:
+            #     rv = np.array([0, 0, poses[1][i]['rvec'][2]], dtype=np.float32)
+            # else:
+            rv = R.from_euler('xz', [np.pi, angle_cur + np.pi], degrees=False).as_rotvec()
+            poses[aruco_id][i]['rvec'] = rv
+        if aruco_id in [2, 3]:
+            cv2.drawFrameAxes(viz_frames[i], mtx, dist, poses[aruco_id][i]['rvec'], poses[aruco_id][i]['tvec'], 0.025)
 
-    cv2.imshow('frame', viz_frames[i])
     
-    if cv2.waitKey(0) & 0xFF == ord('q'):
+    mat = np.eye(4)
+    mat[:3, :3] = R.from_rotvec(poses[3][i]['rvec'].squeeze()).as_matrix()
+    mat[:3, 3] = poses[3][i]['tvec'].squeeze()
+    mat = mat @ rigid_transform_to_center
+
+    id_in_ground_frame = np.linalg.inv(ground_frame) @ mat
+    poses['center_link'].append({
+        'id_in_ground_frame' : id_in_ground_frame,
+        'rvec_cam' : poses[3][i]['rvec'],
+        'tvec_cam' : mat[:3, 3],
+        'tvec' : id_in_ground_frame[:3, 3],
+        'mat' : mat,
+    })
+
+    cv2.drawFrameAxes(viz_frames[i], mtx, dist, poses['center_link'][i]['rvec_cam'], poses['center_link'][i]['tvec_cam'], 0.025)
+    
+    if i < difference_frames:
+        continue
+
+    angle_prev = get_slope(i - difference_frames)
+    # cur_pos = poses['center_link'][i]['tvec']
+    # prev_pos = poses['center_link'][i - difference_frames]['tvec']
+
+    cur_pos = poses[3][i]['tvec'].squeeze()
+    prev_pos = poses[3][i - difference_frames]['tvec'].squeeze()
+    delta_pos = cur_pos - prev_pos
+    print(delta_pos)
+    delx, dely, delz = delta_pos
+    deltheta = angle_cur - angle_prev
+    # lift, extension, lateral, roll, gripper
+    action = [
+        delx,
+        dely,
+        delz,
+        deltheta,
+        0
+    ]
+    actions.append(action)
+
+    center = (640, 360)
+    if abs(delz) > 0.003:
+        length = int(100 * abs(delz) / 0.01)
+        
+        if delz < 0:
+            cv2.arrowedLine(lframes[i], center, (center[0], center[1] + length) , (0, 255, 0), 2)
+        else:
+            cv2.arrowedLine(lframes[i],  center, (center[0], center[1] - length),(0, 255, 0), 2)
+
+    if abs(dely) > 0.003:
+        col = int (255 * abs(dely) / 0.1 + 128)
+        if dely < 0:
+            cv2.circle(lframes[i], center, 30, (0, col, 0), -1)
+        else:
+            cv2.circle(lframes[i], center, 30, (0, 0, col), -1)
+            
+
+    if abs(delx) > 0.003:
+        length = int(100 * abs(delx) / 0.01)
+        if delx < 0:
+            cv2.arrowedLine(lframes[i], center, (center[0] - length, center[1]) , (0, 0, 255), 2)
+        else:
+            cv2.arrowedLine(lframes[i],  center, (center[0] + length, center[1]),(0, 0, 255), 2)
+
+    fr = np.hstack([viz_frames[i], lframes[i]])
+    cv2.imshow('frame', fr)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 with open('actions.json', 'w') as f:

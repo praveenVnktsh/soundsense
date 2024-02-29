@@ -77,10 +77,14 @@ old_points_right = [rcenter + np.random.rand(2) * rthresh for i in range(100)]
 old_points_right = np.array(old_points_right, dtype=np.float32)
 
 parameter_lucas_kanade = dict(winSize=(30, 30), maxLevel=10, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.02))
+
 ret, frame = cap.read()
 frame = frame[:, 1280:]
+frame_idx = 1
 frame_gray_init = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-actions = []
+with open('actions.json', 'r') as f:
+    actions = json.load(f)
+
 while True:
     ret, frame = cap.read()
     
@@ -129,19 +133,19 @@ while True:
     cv2.circle(rframe, lmean.astype(int), 5, (0, 0, 255), -1)
     dist = np.linalg.norm(rmean - lmean)
     if dist > 290:
-        actions.append(0)
+        actions[frame_idx][-1] = (0)
         cv2.arrowedLine(rframe, (640, 360), (540, 360), (255, 255, 0), 2)
         cv2.arrowedLine(rframe, (640, 360), (740, 360), (255, 255, 0), 2)
     else:
-        actions.append(1)
+        actions[frame_idx][-1] = (1)
         cv2.arrowedLine(rframe, (540, 360), (640, 360) , (0, 0, 255), 2)
         cv2.arrowedLine(rframe,  (740, 360), (640, 360), (0, 0, 255), 2)
 
-
+    frame_idx += 1
     print(dist)
     cv2.imshow('frame', rframe)
     
-    if cv2.waitKey(0) & 0xFF == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 with open('actions.json', 'w') as f:
