@@ -1,0 +1,3 @@
+actor_loss,actor_new_loss,actor_old_loss,step
+inf,nan,inf,10
+inf,nan,inf,30

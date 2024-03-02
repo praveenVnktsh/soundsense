@@ -1,0 +1,44 @@
+action_repeat: 1
+agent:
+  class: drq.DRQAgent
+  name: drq
+  params:
+    action_range: ???
+    action_shape: ???
+    lowdim_dim: ???
+    obs_shape: ???
+append_mode: true
+audio: false
+batch_size: 128
+cameraName: agentview_image
+demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/hydralogs/
+device: cuda
+env: drq-robosuite
+environmentName: IndicatorBoxBlock
+episodeLength: 500
+episodes: 48
+eval_frequency: 10000
+horizon: 500
+image_pad: 4
+image_size: 84
+log_frequency_step: 10000
+log_save_tb: true
+lr: 0.001
+modalities:
+- object_sound
+- robot0_eef_pos
+- robot0_gripper_qpos
+- robot0_gripper_qvel
+num_eval_episodes: 2
+num_seed_steps: 1000
+num_train_iters: 1
+num_train_steps: 5000000
+recordFrq: 10
+runName: run_${episodes}
+save_video: true
+seed: 10
+sparseProp: 0.75
+stack: 1
+stacked: true
+system: sim
+use_lowdim: true

@@ -38,8 +38,11 @@ class Encoder(nn.Module):
         for param in self.convs.parameters():
             param.requires_grad = True
         self.head = nn.Sequential(
-            nn.Linear(512 + self.lowdim, self.feature_dim),
+            nn.Linear(512, self.feature_dim),
             nn.LayerNorm(self.feature_dim))
+        # self.head = nn.Sequential(
+        #     nn.Linear(512 + self.lowdim, self.feature_dim),
+        #     nn.LayerNorm(self.feature_dim))
 
         self.outputs = dict()
 
@@ -59,18 +62,20 @@ class Encoder(nn.Module):
             self.convs.eval()
             self.head.eval()
 
-    def forward(self, lowdim, obs, detach=False):
+    # def forward(self, lowdim, obs, detach=False):
+    def forward(self, obs, detach=False):
         h = self.forward_conv(obs)
         if detach:
             h = h.detach()
 
         # a slightly hacky solution to allow for training / test compatibility
-        if lowdim.shape[1] == 1:
-            # [N, 1, D] -> [N, D]
-            lowdim = lowdim[:, 0, ...]
+        # if lowdim.shape[1] == 1:
+        #     # [N, 1, D] -> [N, D]
+        #     lowdim = lowdim[:, 0, ...]
             # lowdim = torch.squeeze(lowdim)
-        combined_states = torch.cat([h, lowdim], dim=-1) #add lowdims here
-        out = self.head(combined_states)
+        # combined_states = torch.cat([h, lowdim], dim=-1) #add lowdims here
+        # out = self.head(combined_states)
+        out = self.head(h)
         if not self.output_logits:
             out = torch.tanh(out)
 
@@ -117,7 +122,8 @@ class Actor(nn.Module):
         batch_size = lowdim.shape[0]
         sequence_length = lowdim.shape[1]
         combined = lowdim.shape[0] * lowdim.shape[1]
-        obs = self.encoder(lowdim.reshape(combined, lowdim.shape[2], lowdim.shape[3]), obs.reshape(combined, obs.shape[2],  obs.shape[3],  obs.shape[4]), detach=detach_encoder)
+        # obs = self.encoder(lowdim.reshape(combined, lowdim.shape[2], lowdim.shape[3]), obs.reshape(combined, obs.shape[2],  obs.shape[3],  obs.shape[4]), detach=detach_encoder)
+        obs = self.encoder(obs.reshape(combined, obs.shape[2],  obs.shape[3],  obs.shape[4]), detach=detach_encoder)
         encoded = obs.reshape(batch_size, sequence_length, -1) #reshaping back into batches of runs
 
 

@@ -10,6 +10,7 @@ import sys
 import cv2
 import soundfile as sf
 from tqdm import tqdm
+import json
 
 import time
 
@@ -59,22 +60,23 @@ class Workspace(object):
         self.device = torch.device(cfg.device)
         # self.env = make_env(cfg)
 
-        
-        if self.cfg.audio:
-            self.replay_buffer = ReplayAudioBuffer((1,130),
-                                                    (9, IMG_WIDTH, IMG_HEIGHT),
-                                                    (57,160), (4,),
-                                                    self.cfg.episodes,
-                                                    self.cfg.episodeLength,
-                                                    self.cfg.image_pad, self.device)
+        if ~self.cfg.append_mode:
+            if self.cfg.audio:
+                self.replay_buffer = ReplayAudioBuffer((1,130),
+                                                        (9, IMG_WIDTH, IMG_HEIGHT),
+                                                        (57,160), (5,),
+                                                        self.cfg.episodes,
+                                                        self.cfg.episodeLength,
+                                                        self.cfg.image_pad, self.device)
+            else:
+                self.replay_buffer = ReplayBuffer((1, 130),                  # TODO: Hardcoded so change
+                                                (9, IMG_WIDTH, IMG_HEIGHT),
+                                                (5,),
+                                                self.cfg.episodes,
+                                                self.cfg.episodeLength,
+                                                self.cfg.image_pad, self.device)
         else:
-            self.replay_buffer = ReplayBuffer((1, 130),                  # TODO: Hardcoded so change
-                                            (9, IMG_WIDTH, IMG_HEIGHT),
-                                            (4,),
-                                            self.cfg.episodes,
-                                            self.cfg.episodeLength,
-                                            self.cfg.image_pad, self.device)
-            
+            self.replay_buffer = pkl.load(open(self.cfg.append_file, "rb"))
 
         # self.video_recorder = VideoRecorder(
         #     self.work_dir if cfg.save_video else None)
@@ -122,9 +124,8 @@ class Workspace(object):
         log_spec = torch.log(spec + EPS)
         # debug(f"log_spec.size() {log_spec.size()}")
         assert log_spec[0].size() == (57, 160), f"audio spec size mismatch. expected (57, 160), got {log_spec[0].size()}"
-        return log_spec[0]     # TODO: return only 1 channel for now
-        # if self.norm_audio:
-        #     log_spec /= log_spec.sum(dim=-2, keepdim=True)  # [1, 64, 100]
+        return log_spec[0]     # TODO: return only left channel for now
+
     
     # frame number = time * 10
     # time = frame number / 10
@@ -133,13 +134,34 @@ class Workspace(object):
     # ((self.step/10)-2)*sr to (self.step/10)*sr
 
 
-    def real_data(self, cfg, img_path, audio_path):
-        buffer_list = list()
+    def real_data(self, cfg, img_dir, audio_dir, action_dir):
+        action_files = os.listdir(action_dir)
 
-        episodeLength = len(os.listdir(img_path))
-        # episodeLength = 4
-        waveforms = sf.read(audio_path)[0]
-        for ep in range(self.cfg.episodes):
+        for ep in range(min(len(action_files), self.cfg.episodes)):
+            buffer_list = list()
+
+            try:
+                run_id = action_files[ep][:-5]
+                img_path = os.path.join(img_dir, "run_"+run_id, "frames/")
+                audio_path = os.path.join(audio_dir, "run_"+run_id, "audio/audio.wav")
+                action_path = os.path.join(action_dir, action_files[ep])
+            except:
+                continue
+
+            # debug(f"img_path {img_path}\n audio_path {audio_path}\n action_path {action_path}")
+
+
+            # episodeLength = 4
+            episodeLength = len(os.listdir(img_path))
+            waveforms = sf.read(audio_path)[0]
+            action_np = np.array(json.load(open(action_path)))
+            # For now since lengths are different
+            actions_idx = np.arange(min(action_np.shape[0], episodeLength*30//10), step=3)
+            action_np = action_np[actions_idx, :]       
+            # debug(f"action_np shape {action_np.shape}")
+
+            episodeLength = min(episodeLength, action_np.shape[0])
+
             self.step = 3
             # while self.step < cfg.episodeLength:
             pbar = tqdm(total=episodeLength-self.step)
@@ -150,7 +172,10 @@ class Workspace(object):
                 obs = self.get_image_frames(img_path, self.step).astype('uint8')
                 # debug(f"{self.step}, {audio_obs.size()}")
                 # debug(f"Loaded images at step {self.step}")
-                action = np.random.rand(4)
+                # action = np.random.rand(4)
+                # Read actions from json
+                action = action_np[self.step]
+                
 
                 # Random because we don't use it
                 lowdim = np.random.rand(130)
@@ -177,16 +202,15 @@ class Workspace(object):
             print("****** ADDED ****** and we are at ", self.replay_buffer.idx)
 
 
-
-
     def run(self, cfg):
-        img_path = '/home/punygod_admin/SoundSense/soundsense/data/run3/frames'
-        audio_path = '/home/punygod_admin/SoundSense/soundsense/data/run3/audio/audio.wav'
-        self.real_data(cfg=cfg, img_path=img_path, audio_path=audio_path)
-        write_path = "/home/punygod_admin/SoundSense/soundsense/data/run3/pbe"
+        img_dir = '/home/punygod_admin/SoundSense/soundsense/data/playbyear_runs/'
+        audio_dir = '/home/punygod_admin/SoundSense/soundsense/data/playbyear_runs/'
+        action_dir = '/home/punygod_admin/SoundSense/soundsense/data/processed/'
+        self.real_data(cfg, img_dir, audio_dir, action_dir)
+        write_path = "/home/punygod_admin/SoundSense/soundsense/data/playbyear_pkls/pbe"
         if cfg.audio:
             write_path+="_audio"
-        write_path+=".pkl"
+        write_path+=f"_{cfg.episodes}.pkl"
         pkl.dump(self.replay_buffer, open(write_path, "wb" ), protocol=4 )
         print("Demos saved")
 

@@ -36,6 +36,7 @@ class SingleEpisode():
 
         self.device = device
         self.idx = 0
+        # debug(f"new SingleEpisode created with idx {self.idx}")
         self.aug_trans = nn.Sequential(
             nn.ReplicationPad2d(image_pad),
             kornia.augmentation.RandomCrop((obs_shape[-1], obs_shape[-1])))
@@ -54,6 +55,7 @@ class SingleEpisode():
         np.copyto(self.not_dones[self.idx], not done)
         np.copyto(self.not_dones_no_max[self.idx], not done_no_max)
         self.idx = self.idx + 1
+        # debug(f"self.idx {self.idx}")
 
     def add(self, episode_list): #so this requires a very minimal change to the current demo-collecting software
         for step in episode_list: #step is a dictionary

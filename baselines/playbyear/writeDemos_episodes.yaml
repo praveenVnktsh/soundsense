@@ -22,23 +22,24 @@ image_pad: 4
 use_lowdim: true
 
 #for save and loading
-demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/dummy/ # CHANGE THIS
+demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/hydralogs/ # CHANGE THIS
 system: sim
 stack: 1 #stack should be 1 for demo collection
 
 environmentName: IndicatorBoxBlock #IMPORTANT: this is the environment that is run
 modalities: [object_sound, robot0_eef_pos, robot0_gripper_qpos, robot0_gripper_qvel]
 cameraName: agentview_image
-runName:  ${environmentName}_${episodes}
+runName:  run_${episodes}
 stacked: true
 audio: false
 
 #Other hyperparameters
-episodeLength: 250 #150 for occluded block, 250 for pick place
-episodes: 1
+episodeLength: 500 #150 for occluded block, 250 for pick place
+episodes: 94
 recordFrq: 10
 sparseProp: 0.75 #what proportion of rewards will be 0 (the rest will be 1)
-
+append_mode: false
+append_file: '/home/punygod_admin/SoundSense/soundsense/data/playbyear_pkls/pbe_44.pkl'
 #different names currently registered
 #IndicatorBoxBlock
 #BlockedPickPlace

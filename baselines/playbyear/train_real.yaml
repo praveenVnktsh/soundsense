@@ -34,7 +34,7 @@ corrections_file: ${load_folder}/corrections/demos_finished.pkl #fill this in la
 #########################
 actor_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/Results/
 # demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/dummy/
-demo_root: /home/punygod_admin/SoundSense/soundsense/data/run3/
+demo_root: /home/punygod_admin/SoundSense/soundsense/data/playbyear_pkls/
 use_squashed: True #squashed vs not squashed distributions
 lowdim_stack: 10
 frame_stack: 3
@@ -43,9 +43,9 @@ system: sim #sim for the mujoco stuff, and "real" for franka
 #####RUN CHANGES HERE ############
 #core adjustements
 seed: 0
-number_demos: 1
+number_demos: 94
 # demo_file: ${environmentName}_${number_demos}/demos.pkl
-demo_file: pbe.pkl
+demo_file: pbe_94.pkl
 stack: 10 # history
 
 #misc training parameters
