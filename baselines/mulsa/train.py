@@ -29,12 +29,12 @@ def strip_sd(state_dict, prefix):
 
 
 def main(args):
-    # train_csv = pd.read_csv(args.train_csv)
-    # val_csv = pd.read_csv(args.val_csv)
+    train_csv = pd.read_csv(args.train_csv)
+    val_csv = pd.read_csv(args.val_csv)
     ## write code to split train test from total TODO    
     if args.num_episode is None:
-        train_num_episode = [1] #len(train_csv)
-        val_num_episode = [1]  #len(val_csv)
+        train_num_episode = len(train_csv)
+        val_num_episode = len(val_csv)
     else:
         train_num_episode = args.num_episode
         val_num_episode = args.num_episode
@@ -42,20 +42,22 @@ def main(args):
     train_set = torch.utils.data.ConcatDataset(
         [
             ImitationEpisode(args, i, args.data_folder)
-            for i in train_num_episode
+            for i in range(train_num_episode)
         ]
     )
     val_set = torch.utils.data.ConcatDataset(
         [
             ImitationEpisode(args, i, args.data_folder, False)
-            for i in val_num_episode
+            for i in range(val_num_episode)
         ]
     )
     
     # create weighted sampler to balance samples
     train_label = []
     ## TODO
-    print("hi", len(train_set.datasets))
+    # print("hi", len(train_set.datasets))
+    ### Not using for now 
+    '''
     for episode in train_set.datasets:
         # print(len(episode))
     #     for idx in range(len(episode)):
@@ -76,6 +78,7 @@ def main(args):
     sampler = torch.utils.data.WeightedRandomSampler(
         samples_weight.type("torch.DoubleTensor"), len(samples_weight)
     )
+    '''
 
     # TODO: num_workers
     train_loader = DataLoader(
@@ -118,7 +121,7 @@ if __name__ == "__main__":
     p.add("--lr", default=1e-4, type=float)
     p.add("--gamma", default=0.9, type=float)
     p.add("--period", default=3)
-    p.add("--epochs", default=3, type=int)
+    p.add("--epochs", default=100, type=int)
     p.add("--resume", default=None)
     p.add("--num_workers", default=8, type=int)
     # imi_stuff
@@ -130,9 +133,9 @@ if __name__ == "__main__":
     p.add("--frameskip", required=True, type=int)
     p.add("--use_mha", default=False, action="store_true") ## multi head attention
     # data
-    p.add("--train_csv", default="data/train.csv")
-    p.add("--val_csv", default="data/val.csv")
-    p.add("--data_folder", default="../../data")
+    p.add("--train_csv", default="src/datasets/data/train.csv")
+    p.add("--val_csv", default="src/datasets/data/val.csv")
+    p.add("--data_folder", default="../../data/playbyear_runs")
     p.add("--resized_height_v", required=True, type=int)
     p.add("--resized_width_v", required=True, type=int)
     p.add("--resized_height_t", required=True, type=int)

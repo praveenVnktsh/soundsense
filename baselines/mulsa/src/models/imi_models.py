@@ -48,9 +48,9 @@ class Actor(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(1024, 3**args.action_dim),
         )
-        self.aux_mlp = torch.nn.Linear(self.layernorm_embed_shape, 6)
+        self.aux_mlp = torch.nn.Linear(self.layernorm_embed_shape, 5) #6
 
-    def forward(self, inputs, _):
+    def forward(self, inputs):
         """
         Args:
             cam_gripper_framestack,audio_clip_g,
@@ -92,9 +92,10 @@ class Actor(torch.nn.Module):
             mlp_inp = self.bottleneck(mlp_inp)
             weights = None
 
-        action_logits = self.mlp(mlp_inp)
-        xyzrpy = self.aux_mlp(mlp_inp)
-        return action_logits, xyzrpy, weights
+        # action_logits = self.mlp(mlp_inp)
+        xyzgt = self.aux_mlp(mlp_inp)
+        # return action_logits, xyzrpy, weights
+        return xyzgt, weights
 
 
 if __name__ == "__main__":

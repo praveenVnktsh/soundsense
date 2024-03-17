@@ -20,7 +20,7 @@ def save_config(args):
     return exp_dir
 
 
-def start_training(args, exp_dir, pl_module, monitor="val/acc"):
+def start_training(args, exp_dir, pl_module, monitor="val/loss"):
     jobid = np.random.randint(0, 1000)
     jobid = os.environ.get("SLURM_JOB_ID", 0)
     exp_time = datetime.now().strftime("%m-%d-%H:%M:%S") + "-jobid=" + str(jobid)
@@ -30,7 +30,7 @@ def start_training(args, exp_dir, pl_module, monitor="val/acc"):
         save_top_k=4,
         save_last=True,
         monitor=monitor,
-        mode="max",
+        mode="min",
     )
 
     logger = TensorBoardLogger(

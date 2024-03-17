@@ -29,7 +29,7 @@ class EpisodeDataset(Dataset):
             "cam_gripper",]
         # pass
 
-    def get_episode(self, idx, ablation=""):
+    def get_episode(self, idx, args, train, ablation=""):
         """
         Return:
             folder for trial
@@ -46,14 +46,30 @@ class EpisodeDataset(Dataset):
             else:
                 return None
 
-        # format_time = self.logs.iloc[idx].Time.replace(":", "_")
-        eps_ = 'run' + str(idx)
-        # print("override" + '#' * 50)
+        # # format_time = self.logs.iloc[idx].Time.replace(":", "_")
+        # eps_ = 'run' + str(idx)
+        # # print("override" + '#' * 50)
+        # trial = os.path.join(self.data_folder, eps_)
+        # with open(os.path.join(trial, "2024-02-27_19-40-16.json")) as ts:
+        #     timestamps = json.load(ts)
+        # timestamps = timestamps[::3]
+
+        if train:
+            train_csv = pd.read_csv(args.train_csv, header=None)[0]
+            eps_ = str(train_csv.iloc[idx])
+            with open(os.path.join("/home/punygod_admin/SoundSense/soundsense/data/processed", eps_[4:] + ".json")) as ts:
+                timestamps = json.load(ts)
+        else:
+            val_csv = pd.read_csv(args.val_csv, header=None)[0]
+            eps_ = str(val_csv.iloc[idx])
+            with open(os.path.join("/home/punygod_admin/SoundSense/soundsense/data/processed", eps_[4:] + ".json")) as ts:
+                timestamps = json.load(ts)
+
         trial = os.path.join(self.data_folder, eps_)
-        with open(os.path.join(trial, "ee_pose.json")) as ts:
-            timestamps = json.load(ts)
+        timestamps = timestamps[::3]
+
         if "ag" in modes:
-            audio_gripper1 = load(os.path.join(trial, "audio", "audio.wav"))
+            audio_gripper1 = load(os.path.join("audio", "audio.wav"))
 
             # audio_gripper_left = audio_gripper1[:,0]
             # audio_gripper_right = audio_gripper1[:,1]
@@ -68,7 +84,7 @@ class EpisodeDataset(Dataset):
             # print("ag", torch.tensor(audio_gripper).shape) #(434176, 2)
             audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
             audio_gripper = (audio_gripper.T[0,:]).reshape(1,-1)
-            print("ag1", audio_gripper.shape) #(434176, 2)
+            # print("ag1", audio_gripper.shape) #(434176, 2)
         else:
             audio_gripper = None
         # print(len(timestamps["action_history"])) # 4297
@@ -77,7 +93,7 @@ class EpisodeDataset(Dataset):
             trial,
             timestamps,
             audio_gripper,
-            92, ##hardcoded
+            len(timestamps), ##hardcoded
             # len(timestamps["action_history"]), TODO
         )
 
@@ -101,6 +117,8 @@ class EpisodeDataset(Dataset):
             torch.as_tensor(np.array(Image.open(img_path))).float().permute(2, 0, 1)
             / 255
         )
+        # print(image.shape)
+        image = image[:,:,image.shape[2]//2:]
         return image
 
     # @staticmethod
@@ -119,7 +137,7 @@ class EpisodeDataset(Dataset):
     @staticmethod
     def clip_resample(audio, audio_start, audio_end):
         left_pad, right_pad = torch.Tensor([]), torch.Tensor([])
-        print("au_size", audio.size())
+        # print("au_size", audio.size())
         if audio_start < 0:
             left_pad = torch.zeros((audio.shape[0], -audio_start))
             audio_start = 0
@@ -129,9 +147,9 @@ class EpisodeDataset(Dataset):
         audio_clip = torch.cat(
             [left_pad, audio[:, audio_start:audio_end], right_pad], dim=1
         )
-        print(f"start {audio_start}, end {audio_end} left {left_pad.size()}, right {right_pad.size()}. audio_clip {audio_clip.size()}")
+        # print(f"start {audio_start}, end {audio_end} left {left_pad.size()}, right {right_pad.size()}. audio_clip {audio_clip.size()}")
         audio_clip = torchaudio.functional.resample(audio_clip, 48000, 16000)
-        print(audio_clip.shape)
+        # print("Inside clip_resample output shape", audio_clip.shape)
         
         return audio_clip
 

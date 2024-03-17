@@ -38,7 +38,7 @@ class ImitationEpisode(EpisodeDataset):
             self.timestamps,
             self.audio_gripper,
             self.num_frames,
-        ) = self.get_episode(dataset_idx, ablation=args.ablation)
+        ) = self.get_episode(dataset_idx, args, train, ablation=args.ablation)
 
         # # saving the offset for gelsight in order to normalize data
         # self.gelsight_offset = (
@@ -75,30 +75,36 @@ class ImitationEpisode(EpisodeDataset):
     def get_demo(self, idx):
         # TODO: Discretize action space if not already
         # print(len(self.timestamps["action_history"]))
-        keyboard = self.timestamps["action_history"][idx]
-        # print(keyboard)
-        if self.task == "pouring":
-            x_space = {-0.0005: 0, 0: 1, 0.0005: 2}
-            dy_space = {-0.0012: 0, 0: 1, 0.004: 2}
-            keyboard = x_space[keyboard[0]] * 3 + dy_space[keyboard[4]]
-        else:
-            x_space = {-0.0005: 0, 0: 1, 0.0005: 2}
-            y_space = {-0.0005: 0, 0: 1, 0.0005: 2}
-            z_space = {-0.0005: 0, 0: 1, 0.0005: 2}
-            keyboard = (
-                x_space[keyboard[0]] * 9
-                + y_space[keyboard[1]] * 3
-                + z_space[keyboard[2]]
-            )
-        return keyboard
+        # keyboard = self.timestamps["action_history"][idx]
+        # # print(keyboard)
+        # if self.task == "pouring":
+        #     x_space = {-0.0005: 0, 0: 1, 0.0005: 2}
+        #     dy_space = {-0.0012: 0, 0: 1, 0.004: 2}
+        #     keyboard = x_space[keyboard[0]] * 3 + dy_space[keyboard[4]]
+        # else:
+        #     x_space = {-0.0005: 0, 0: 1, 0.0005: 2}
+        #     y_space = {-0.0005: 0, 0: 1, 0.0005: 2}
+        #     z_space = {-0.0005: 0, 0: 1, 0.0005: 2}
+        #     keyboard = (
+        #         x_space[keyboard[0]] * 9
+        #         + y_space[keyboard[1]] * 3
+        #         + z_space[keyboard[2]]
+        #     )
+        action_timet = self.timestamps[idx]
+        return action_timet 
 
     def __getitem__(self, idx):
-        print("idx", idx, self.max_len)
+        # print("idx_in_getitem", idx, self.max_len)
         start = idx - self.max_len
-        print("start", start)
+        # print("start", start)
         # compute which frames to use TODO
         frame_idx = np.arange(start, idx + 1, self.frameskip)
+        # print("frame_idx_len", len(frame_idx))
         frame_idx[frame_idx < 0] = -1
+
+        # print("len_timestamps", self.num_frames)
+        frame_idx[frame_idx >= self.num_frames] = self.num_frames - 1
+
         # images
         # to speed up data loading, do not load img if not using
         cam_gripper_framestack = 0
@@ -117,7 +123,7 @@ class ImitationEpisode(EpisodeDataset):
 
         # random cropping
         if self.train:
-            # print("idx1", idx)
+            # print("idx_in_getitem_train", idx)
             img = self.transform_cam(
                 self.load_image(self.trial, "frames", idx)
             )
@@ -139,31 +145,33 @@ class ImitationEpisode(EpisodeDataset):
                 ]
 
         # load audio
-        # audio_end = idx * self.resolution
-        # audio_start = audio_end - self.audio_len  # why self.sr // 2, and start + sr
-        print("idx..", idx)
-        audio_start = int((idx/10-3)*self.sr)
-        audio_end = int((idx/10)*self.sr)
-        print(self.audio_len, audio_end, audio_start, self.resolution)
+        # print("idx_in_getitem_after_train", idx)
+        audio_end = idx * self.resolution
+        audio_start = audio_end - self.audio_len  # why self.sr // 2, and start + sr
+        # audio_start = int((idx/10-3)*self.sr)      # TODO: why divide by 10
+        # audio_end = int((idx/10)*self.sr)
+        # print(self.audio_len, audio_end, audio_start, self.resolution)
         if self.audio_gripper is not None:
             audio_clip_g = self.clip_resample(
                 self.audio_gripper, audio_start, audio_end
             ).float()
-            print("ag", audio_clip_g.shape)
+            # print("ag", audio_clip_g.shape)
+            # assert audio_clip_g.shape == torch.Size([1, int(self.audio_len/3)])
         else:
             audio_clip_g = 0
  
         # load labels ## TODO
-        keyboard = random.randint(0, 2)  # self.get_demo(idx)
-        xyzrpy =  torch.Tensor(self.timestamps["action_history"][idx][:6])
-        # torch.Tensor(self.timestamps["pose_history"][idx][:6])
+        # keyboard = random.randint(0, 2)  # self.get_demo(idx)
+        # xyzpry = torch.Tensor(self.timestamps["pose_history"][idx][:6])
+        # print("time", len(self.timestamps))
+        xyzgt =  torch.Tensor(self.timestamps[idx])
+        # print("xyz", xyzgt.shape)  
 
         return (
             (cam_gripper_framestack,
             audio_clip_g,),
-            keyboard,
-            xyzrpy,
-            start,
+            # keyboard,
+            xyzgt,
         )
 
 
