@@ -41,7 +41,7 @@ class SingleEpisode():
 
         self.priorities = None #which indexes to select the most from
 
-    def _add(self, lowdim, obs, audio,action, shaped_reward, sparse_reward, next_lowdim, next_obs, next_audio, done, done_no_max):
+    def _add(self, obs, audio,action, shaped_reward, sparse_reward, next_obs, next_audio, done, done_no_max):
         assert self.idx < self.episode_length, "something's wrong! You added too much data "
         # np.copyto(self.lowdim[self.idx], lowdim)
         np.copyto(self.obses[self.idx], obs)
@@ -147,11 +147,11 @@ class SingleEpisode():
 
 class ReplayBufferAudioEpisodes(IterableDataset):
     """Buffer to store environment transitions."""
-    def __init__(self, lowdim_shape, obs_shape, audio_shape, action_shape, episodes, episode_length, image_pad, device):
+    def __init__(self, obs_shape, audio_shape, action_shape, episodes, episode_length, image_pad, device):
         self.numEpisodes = episodes
         self.device = device
         self.episodeLength = episode_length
-        self.lowdim_shape = lowdim_shape
+        # self.lowdim_shape = lowdim_shape
         self.obs_shape = obs_shape
         self.action_shape = action_shape
         self.image_pad = image_pad

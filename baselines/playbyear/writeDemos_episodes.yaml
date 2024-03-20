@@ -31,11 +31,11 @@ modalities: [object_sound, robot0_eef_pos, robot0_gripper_qpos, robot0_gripper_q
 cameraName: agentview_image
 runName:  run_${episodes}
 stacked: true
-audio: false
+audio: true
 
 #Other hyperparameters
+episodes: 1  ##### CHANGE this to required no. of episodes to save in pkl #####
 episodeLength: 500 #150 for occluded block, 250 for pick place
-episodes: 1
 recordFrq: 10
 sparseProp: 0.75 #what proportion of rewards will be 0 (the rest will be 1)
 append_mode: false

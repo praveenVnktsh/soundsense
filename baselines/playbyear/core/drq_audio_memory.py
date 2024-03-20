@@ -24,7 +24,7 @@ from torch import distributions as pyd
 
 class Encoder(nn.Module):
     """Convolutional encoder for image-based observations."""
-    def __init__(self, obs_shape, feature_dim, lowdim_dim, audio_steps, audio_bins, audio_feature_dim, num_layers, num_filters, output_dim, output_logits):
+    def __init__(self, obs_shape, feature_dim, audio_steps, audio_bins, audio_feature_dim, num_layers, num_filters, output_dim, output_logits):
         super().__init__()
         assert len(obs_shape) == 3
         self.audio_steps = audio_steps #how many timesteps
@@ -33,7 +33,7 @@ class Encoder(nn.Module):
         self.num_filters = num_filters
         self.output_dim = output_dim
         self.output_logits = output_logits
-        self.lowdim = lowdim_dim
+        # self.lowdim = lowdim_dim
         self.feature_dim = feature_dim
 
 
@@ -53,7 +53,7 @@ class Encoder(nn.Module):
         for param in self.convs.parameters():
             param.requires_grad = True
         self.head = nn.Sequential(
-            nn.Linear(512 + self.lowdim + 264, self.feature_dim),
+            nn.Linear(512 + 264, self.feature_dim),
             nn.LayerNorm(self.feature_dim)) #a bit hacky with the 10
 
         self.outputs = dict()
@@ -77,7 +77,7 @@ class Encoder(nn.Module):
         h = conv.view(conv.size(0), -1)
         return h
 
-    def forward(self, lowdim, obs, audio, detach=False):
+    def forward(self, obs, audio, detach=False):
         if len(audio.shape) < 3: #expanding to fit the batch requirement
             torch.unsqueeze(audio, 0)
         #preliminary checks
@@ -94,10 +94,11 @@ class Encoder(nn.Module):
             h_aud = h_aud.detach()
 
         #a slightly hacky solutoin to solve dimensionality problem
-        if(np.shape(lowdim)[0] > 1):
-            lowdim = torch.squeeze(lowdim)
+        # if(np.shape(lowdim)[0] > 1):
+        #     lowdim = torch.squeeze(lowdim)
 
-        combined_states = torch.cat([h, lowdim, h_aud], dim=-1) #add lowdims here
+        # combined_states = torch.cat([h, lowdim, h_aud], dim=-1) #add lowdims here
+        combined_states = torch.cat([h, h_aud], dim=-1) #add lowdims here
 
         out = self.head(combined_states)
         if not self.output_logits:
@@ -129,19 +130,19 @@ class Actor(nn.Module):
 
         self.apply(utils.weight_init)
 
-    def forward(self, lowdim, obs, audio, detach_encoder = False, squashed = True):
+    def forward(self, obs, audio, detach_encoder = False, squashed = True):
         # squashed is a remant from AWAC experiment; you can ignore
         # preliminary checks
-        assert lowdim.shape[0] == obs.shape[0] #batch size
-        assert lowdim.shape[0] == audio.shape[0] #batch size
-        assert lowdim.shape[1] == obs.shape[1] #sequence leng
-        assert lowdim.shape[1] == audio.shape[1] #sequence lengh
+        # assert lowdim.shape[0] == obs.shape[0] #batch size
+        # assert lowdim.shape[0] == audio.shape[0] #batch size
+        # assert lowdim.shape[1] == obs.shape[1] #sequence leng
+        # assert lowdim.shape[1] == audio.shape[1] #sequence lengh
 
-        batch_size = lowdim.shape[0]
-        sequence_length = lowdim.shape[1]
+        batch_size = obs.shape[0]
+        sequence_length = obs.shape[1]
 
-        combined = lowdim.shape[0] * lowdim.shape[1]
-        obs = self.encoder(lowdim.view(combined, lowdim.shape[2], lowdim.shape[3]), obs.view(combined, obs.shape[2],  obs.shape[3],  obs.shape[4]), audio.view(combined, audio.shape[2], audio.shape[3]), detach=detach_encoder)
+        combined = obs.shape[0] * obs.shape[1]
+        obs = self.encoder(obs.view(combined, obs.shape[2],  obs.shape[3],  obs.shape[4]), audio.view(combined, audio.shape[2], audio.shape[3]), detach=detach_encoder)
         encoded = obs.reshape(batch_size, sequence_length, -1) #reshaping back into batches of runs
 
 
@@ -195,13 +196,13 @@ class DRQAgent(object):
     def __init__(self, obs_shape, action_shape, action_range, device,
                  encoder_cfg, critic_cfg, actor_cfg, discount,
                  init_temperature, lr, actor_update_frequency, critic_tau,
-                 critic_target_update_frequency, batch_size, lowdim_dim, log_frequency):
+                 critic_target_update_frequency, batch_size, log_frequency):
         self.action_range = action_range
         self.device = device
         self.discount = discount
         self.actor_update_frequency = actor_update_frequency
         self.batch_size = batch_size
-        self.lowdim_dim = lowdim_dim
+        # self.lowdim_dim = lowdim_dim
         self.log_frequency = log_frequency
 
         self.actor = hydra.utils.instantiate(actor_cfg).to(self.device)
@@ -254,8 +255,8 @@ class DRQAgent(object):
         return self.log_alpha.exp()
 
     # helper function
-    def to_tensor(self, lowdim, obs, audio, action, reward = None, done_no_max = None):
-        lowdim = torch.as_tensor(lowdim, device=self.device).float() #loading to memory
+    def to_tensor(self, obs, audio, action, reward = None, done_no_max = None):
+        # lowdim = torch.as_tensor(lowdim, device=self.device).float() #loading to memory
         obs = torch.as_tensor(obs, device=self.device).float()
         action = torch.as_tensor(action, device=self.device).float()
         audio = torch.as_tensor(audio, device=self.device).float()
@@ -263,7 +264,7 @@ class DRQAgent(object):
             reward = torch.as_tensor(reward, device=self.device).float()
         if done_no_max is not None:
             done_no_max = torch.as_tensor(done_no_max, device=self.device).float()
-        return lowdim, obs, audio, action, reward, done_no_max
+        return obs, audio, action, reward, done_no_max
 
     # helper function
     def augment_observation(self, obs):
@@ -279,25 +280,25 @@ class DRQAgent(object):
         new_obs = new_obs.view(batch, rollout, obs.shape[2], obs.shape[3], obs.shape[4]) #reshapes after aug
         return new_obs
 
-    def act(self, lowdim, obs, audio, sample=False, squash = True):
+    def act(self, obs, audio, sample=False, squash = True):
         obs = torch.FloatTensor(obs).to(self.device)
         obs = obs.unsqueeze(0)
 
-        lowdim = torch.FloatTensor(lowdim).to(self.device)
-        lowdim = lowdim.unsqueeze(0)
+        # lowdim = torch.FloatTensor(lowdim).to(self.device)
+        # lowdim = lowdim.unsqueeze(0)
 
         audio = torch.FloatTensor(audio).to(self.device)
         audio = audio.unsqueeze(0)
 
-        dist = self.actor(lowdim, obs, audio, squashed = squash)
+        dist = self.actor(obs, audio, squashed = squash)
         action = dist.sample() if sample else dist.mean
         action = action.clamp(*self.action_range)
         assert action.ndim == 2 and action.shape[0] == 1
         return utils.to_np(action[0])
 
-    def update_actor_bc(self, lowdim, obs, audio, logger, step, action, squash = True): #only for pure BC
+    def update_actor_bc(self, obs, audio, logger, step, action, squash = True): #only for pure BC
         beg = time.time()
-        dist = self.actor(lowdim, obs, audio, detach_encoder=False, squashed = squash)
+        dist = self.actor(obs, audio, detach_encoder=False, squashed = squash)
         agent_action = dist.mean
         loss = nn.MSELoss()
 
@@ -314,18 +315,18 @@ class DRQAgent(object):
         self.actor.log(logger, step)
 
     def update_bc(self, replay_buffer, logger, step, squash = True):
-        lowdim, obs, audio, action, reward, next_lowdim, next_obses, next_audio, not_dones_no_max = next(replay_buffer)
-        lowdim, obs, audio, action, _, _ = self.to_tensor(lowdim, obs, audio, action)
+        obs, audio, action, reward, next_obses, next_audio, not_dones_no_max = next(replay_buffer)
+        obs, audio, action, _, _ = self.to_tensor(obs, audio, action)
         obs /= 255
         obs = self.augment_observation(obs)
-        self.update_actor_bc(lowdim, obs, audio, logger, step, action, squash)
+        self.update_actor_bc(obs, audio, logger, step, action, squash)
 
     # for intervention training
     def update_bc_balanced(self, replay_buffer1, replay_buffer2, logger, step, squash = True):
-        lowdim1, obs1, audio1, action1, reward, next_lowdim, next_obses, next_audio, not_dones_no_max = next(replay_buffer1)
-        lowdim1, obs1, audio1, action1, _, _ = self.to_tensor(lowdim1, obs1, audio1, action1)
-        lowdim2, obs2, audio2, action2, reward, next_lowdim, next_obses, next_audio, not_dones_no_max = next(replay_buffer2)
-        lowdim2, obs2, audio2, action2, _, _ = self.to_tensor(lowdim2, obs2, audio2, action2)
+        obs1, audio1, action1, reward, next_obses, next_audio, not_dones_no_max = next(replay_buffer1)
+        obs1, audio1, action1, _, _ = self.to_tensor(obs1, audio1, action1)
+        obs2, audio2, action2, reward, next_obses, next_audio, not_dones_no_max = next(replay_buffer2)
+        obs2, audio2, action2, _, _ = self.to_tensor(obs2, audio2, action2)
 
         obs1 /= 255
         obs2 /= 255
@@ -333,9 +334,9 @@ class DRQAgent(object):
         obs1 = self.augment_observation(obs1)
         obs2 = self.augment_observation(obs2)
 
-        lowdim = torch.cat([lowdim1, lowdim2], axis = 0)
+        # lowdim = torch.cat([lowdim1, lowdim2], axis = 0)
         obs = torch.cat([obs1, obs2], axis = 0)
         audio = torch.cat([audio1, audio2], axis = 0)
         action = torch.cat([action1, action2], axis = 0)
 
-        self.update_actor_bc(lowdim, obs, audio, logger, step, action, squash)
+        self.update_actor_bc(obs, audio, logger, step, action, squash)

@@ -67,7 +67,7 @@ def make_env(cfg):
         if key in cfg.modalities:
             dims += np.shape(ob_dict[key])[0]
 
-    cfg.agent.params.lowdim_dim = cfg.lowdim_stack *  dims
+    # cfg.agent.params.lowdim_dim = cfg.lowdim_stack * d dims
     # debug(f"dim in make_env: {dims}")
     env = utils.FrameStack_StackCat(env, cfg, k=cfg.frame_stack,  l_k = cfg.lowdim_stack, stack_depth = cfg.stack, demo = True, audio = False)
 

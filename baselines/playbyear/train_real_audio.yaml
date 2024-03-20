@@ -34,7 +34,7 @@ corrections_file: ${load_folder}/corrections/demos_finished.pkl #fill this in la
 #########################
 actor_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/Results/
 # demo_root: /home/punygod_admin/SoundSense/soundsense/baselines/playbyear/dummy/
-demo_root: /home/punygod_admin/SoundSense/soundsense/data/run3/
+demo_root: /home/punygod_admin/SoundSense/soundsense/data/playbyear_pkls/
 use_squashed: True #squashed vs not squashed distributions
 lowdim_stack: 10
 frame_stack: 3
@@ -43,15 +43,15 @@ system: sim #sim for the mujoco stuff, and "real" for franka
 #####RUN CHANGES HERE ############
 #core adjustements
 seed: 0
-number_demos: 1
+number_demos: 1   ##### CHANGES THIS to match number of episodes stored in pkl #####
 # demo_file: ${environmentName}_${number_demos}/demos.pkl
-demo_file: pbe_audio.pkl
+demo_file: pbe_audio_${number_demos}.pkl 
 stack: 10 # history
 
 #misc training parameters
 batch_size: 16 #used to be 32
-num_train_steps: 110000
-eval_frequency: 10000
+num_train_steps: 100 #110000
+eval_frequency: 50 #10000
 num_eval_episodes: 20 # used to be 20
 expert_workers: 4
 correction_workers: 4
@@ -101,7 +101,7 @@ agent:
     obs_shape: ??? # to be specified later
     action_shape: ??? # to be specified later
     action_range: ??? # to be specified later
-    lowdim_dim: ??? #to b e specified later
+    # lowdim_dim: ??? #to b e specified later
     device: ${device}
     encoder_cfg: ${encoder}
     critic_cfg: ${critic}
@@ -139,7 +139,7 @@ encoder:
   params:
       obs_shape: ${agent.params.obs_shape}
       feature_dim: 50 #used to be 50
-      lowdim_dim: ${agent.params.lowdim_dim}
+      # lowdim_dim: ${agent.params.lowdim_dim}
       audio_steps: 57
       audio_bins: 160
       audio_feature_dim: 10

@@ -42,16 +42,15 @@ system: sim #sim for the mujoco stuff, and "real" for franka
 
 #####RUN CHANGES HERE ############
 #core adjustements
-seed: 0
-number_demos: 94
-# demo_file: ${environmentName}_${number_demos}/demos.pkl
-demo_file: pbe_1.pkl
+seed: 1
+number_demos: 50 ##### CHANGES THIS to match number of episodes stored in pkl #####
+demo_file: pbe_${number_demos}.pkl
 stack: 10 # history
 
 #misc training parameters
 batch_size: 16 #used to be 32
-num_train_steps: 110000
-eval_frequency: 10000
+num_train_steps: 1000 #110000
+eval_frequency: 500 #10000
 num_eval_episodes: 20 # used to be 20
 expert_workers: 4
 correction_workers: 4
