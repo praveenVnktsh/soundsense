@@ -45,7 +45,7 @@ system: sim #sim for the mujoco stuff, and "real" for franka
 seed: 0
 number_demos: 94
 # demo_file: ${environmentName}_${number_demos}/demos.pkl
-demo_file: pbe_94.pkl
+demo_file: pbe_1.pkl
 stack: 10 # history
 
 #misc training parameters

@@ -35,7 +35,7 @@ audio: false
 
 #Other hyperparameters
 episodeLength: 500 #150 for occluded block, 250 for pick place
-episodes: 94
+episodes: 1
 recordFrq: 10
 sparseProp: 0.75 #what proportion of rewards will be 0 (the rest will be 1)
 append_mode: false
@@ -73,7 +73,7 @@ agent:
     obs_shape: ??? # to be specified later
     action_shape: ??? # to be specified later
     action_range: ??? # to be specified later
-    lowdim_dim: ??? #to b e specified later
+    # lowdim_dim: ??? #to b e specified later
 
 
 # hydra configuration

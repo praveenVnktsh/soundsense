@@ -62,14 +62,14 @@ class Workspace(object):
 
         if ~self.cfg.append_mode:
             if self.cfg.audio:
-                self.replay_buffer = ReplayAudioBuffer((1,130),
+                self.replay_buffer = ReplayAudioBuffer(
                                                         (9, IMG_WIDTH, IMG_HEIGHT),
                                                         (57,160), (5,),
                                                         self.cfg.episodes,
                                                         self.cfg.episodeLength,
                                                         self.cfg.image_pad, self.device)
             else:
-                self.replay_buffer = ReplayBuffer((1, 130),                  # TODO: Hardcoded so change
+                self.replay_buffer = ReplayBuffer(                  # TODO: Hardcoded so change
                                                 (9, IMG_WIDTH, IMG_HEIGHT),
                                                 (5,),
                                                 self.cfg.episodes,
@@ -180,7 +180,7 @@ class Workspace(object):
                 # Random because we don't use it
                 # lowdim = np.random.rand(130)
                 reward = 0.
-                next_lowdim = np.random.rand(130)
+                # next_lowdim = np.random.rand(130)
                 next_obs = np.random.randint(low=0, high=255, size=(9, IMG_WIDTH, IMG_HEIGHT)).astype('uint8')
                 done = 0.
                 done_no_max = 0.

@@ -268,9 +268,9 @@ class DRQAgent(object):
         agent_action = dist.mean
         loss = nn.MSELoss()
         action = action[:, -1, :] #pick last action to compare to
-        print("Before loss calc. predicted action: ", agent_action, "actual action: ", action)
+        # print("Before loss calc. predicted action: ", agent_action, "actual action: ", action)
         actor_loss = loss(agent_action, action)
-        print("After loss calc. actor_loss:", actor_loss)
+        # print("After loss calc. actor_loss:", actor_loss)
 
         with torch.no_grad():
             old_loss = loss(agent_action[0 : self.batch_size], action[0 : self.batch_size])
@@ -322,7 +322,7 @@ class DRQAgent(object):
 
     def update_bc(self, replay_buffer, logger, step, squash = True):
         t0 = time.time()
-        lowdim, obs, action, reward, next_lowdim, next_obses, not_dones_no_max= next(replay_buffer)
+        obs, action, reward, next_obses, not_dones_no_max= next(replay_buffer)
         t1 = time.time()
         obs, action, _, _ = self.to_tensor(obs, action)
         t2 = time.time()
@@ -336,15 +336,15 @@ class DRQAgent(object):
 
     #if balanced batches are used
     def update_bc_balanced(self, base_buffer, intervention_buffer, logger, step, squash = True):
-        lowdim1, obs1, action1, reward, next_lowdim, next_obses, not_dones_no_max = next(base_buffer)
-        lowdim2, obs2, action2, reward, next_lowdim, next_obses, not_dones_no_max = next(intervention_buffer)
-        lowdim1, obs1, action1, _, _ = self.to_tensor(lowdim1, obs1, action1)
-        lowdim2, obs2, action2, _, _ = self.to_tensor(lowdim2, obs2, action2)
+        obs1, action1, reward, next_obses, not_dones_no_max = next(base_buffer)
+        obs2, action2, reward, next_obses, not_dones_no_max = next(intervention_buffer)
+        obs1, action1, _, _ = self.to_tensor(obs1, action1)
+        obs2, action2, _, _ = self.to_tensor(obs2, action2)
         obs1 = obs1 / 255.
         obs2 = obs2 / 255.
         obs1 = self.augment_observation(obs1)
         obs2 = self.augment_observation(obs2)
-        lowdim = torch.cat([lowdim1, lowdim2], axis = 0)
+        # lowdim = torch.cat([lowdim1, lowdim2], axis = 0)
         obs = torch.cat([obs1, obs2], axis = 0)
         action = torch.cat([action1, action2], axis = 0)
         self.update_actor_bc(obs, logger, step, action, squash)
