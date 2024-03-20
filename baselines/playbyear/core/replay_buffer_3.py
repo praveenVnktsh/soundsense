@@ -17,11 +17,11 @@ def debug(str):
     print("\033[33mDEBUG: "+str+"\033[0m")
 
 class SingleEpisode():
-    def __init__(self, episode_length, lowdim_shape, obs_shape, action_shape, image_pad, device):
+    def __init__(self, episode_length, obs_shape, action_shape, image_pad, device):
         self.episode_length = episode_length
 
-        self.lowdim = np.empty((episode_length, *lowdim_shape), dtype=np.float32)
-        self.next_lowdim = np.empty((episode_length, *lowdim_shape), dtype=np.float32)
+        # self.lowdim = np.empty((episode_length, *lowdim_shape), dtype=np.float32)
+        # self.next_lowdim = np.empty((episode_length, *lowdim_shape), dtype=np.float32)
 
         self.obses = np.empty((episode_length, *obs_shape), dtype=np.uint8)
         self.next_obses = np.empty((episode_length, *obs_shape), dtype=np.uint8)
@@ -43,15 +43,15 @@ class SingleEpisode():
 
         self.priorities = None #which indexes to select the most from
 
-    def _add(self, lowdim, obs, action, shaped_reward, sparse_reward, next_lowdim, next_obs, done, done_no_max):
+    def _add(self, obs, action, shaped_reward, sparse_reward, next_obs, done, done_no_max):
         assert self.idx < self.episode_length, "something's wrong! You added too much data "
-        np.copyto(self.lowdim[self.idx], lowdim)
+        # np.copyto(self.lowdim[self.idx], lowdim)
         np.copyto(self.obses[self.idx], obs)
         np.copyto(self.actions[self.idx], action)
         np.copyto(self.shaped_rewards[self.idx], shaped_reward)
         np.copyto(self.sparse_rewards[self.idx], sparse_reward)
         np.copyto(self.next_obses[self.idx], next_obs)
-        np.copyto(self.next_lowdim[self.idx], next_lowdim)
+        # np.copyto(self.next_lowdim[self.idx], next_lowdim)
         np.copyto(self.not_dones[self.idx], not done)
         np.copyto(self.not_dones_no_max[self.idx], not done_no_max)
         self.idx = self.idx + 1
@@ -69,13 +69,13 @@ class SingleEpisode():
         startIdx = index
         #padding allows for the sampling of initial actions
 
-        padded_lowdim = np.pad(self.lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
-        padded_next_lowdim = np.pad(self.next_lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
+        # padded_lowdim = np.pad(self.lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
+        # padded_next_lowdim = np.pad(self.next_lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
         padded_obses = np.pad(self.obses, ((length - 1, 0), (0, 0), (0, 0), (0, 0)), "edge")
         padded_next_obses = np.pad(self.next_obses, ((length - 1, 0), (0, 0), (0, 0), (0, 0)), "edge")
 
-        lowdim = padded_lowdim[startIdx:startIdx + length]
-        next_lowdim = padded_next_lowdim[startIdx:startIdx + length]
+        # lowdim = padded_lowdim[startIdx:startIdx + length]
+        # next_lowdim = padded_next_lowdim[startIdx:startIdx + length]
         obses = padded_obses[startIdx:startIdx + length]
         next_obses = padded_next_obses[startIdx:startIdx + length]
 
@@ -97,7 +97,7 @@ class SingleEpisode():
         padded_not_dones = np.pad(self.not_dones, ((length - 1, 0), (0, 0)), "edge")
         not_dones = padded_not_dones[startIdx:startIdx + length]
 
-        return lowdim, obses, actions, shaped_rewards, sparse_rewards, next_lowdim, next_obses, not_dones, not_dones_no_max
+        return obses, actions, shaped_rewards, sparse_rewards, next_obses, not_dones, not_dones_no_max
 
     def sample_rollout_episode(self, length, shaped_rewards = True, correctionsOnly = False):
         if correctionsOnly:
@@ -119,13 +119,13 @@ class SingleEpisode():
 
         #padding allows for the sampling of initial actions
         # debug(f"lowdim in replay buffer: {self.lowdim.shape}")
-        padded_lowdim = np.pad(self.lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
-        padded_next_lowdim = np.pad(self.next_lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
+        # padded_lowdim = np.pad(self.lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
+        # padded_next_lowdim = np.pad(self.next_lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
         padded_obses = np.pad(self.obses, ((length - 1, 0), (0, 0), (0, 0), (0, 0)), "edge")
         padded_next_obses = np.pad(self.next_obses, ((length - 1, 0), (0, 0), (0, 0), (0, 0)), "edge")
 
-        lowdim = padded_lowdim[startIdx:startIdx + length]
-        next_lowdim = padded_next_lowdim[startIdx:startIdx + length]
+        # lowdim = padded_lowdim[startIdx:startIdx + length]
+        # next_lowdim = padded_next_lowdim[startIdx:startIdx + length]
         obses = padded_obses[startIdx:startIdx + length]
         next_obses = padded_next_obses[startIdx:startIdx + length]
 
@@ -139,15 +139,15 @@ class SingleEpisode():
         padded_not_dones_no_max = np.pad(self.not_dones_no_max, ((length - 1, 0), (0, 0)), "edge")
         not_dones_no_max = padded_not_dones_no_max[startIdx:startIdx + length]
 
-        return lowdim, obses, actions, rewards, next_lowdim, next_obses, not_dones_no_max
+        return obses, actions, rewards, next_obses, not_dones_no_max
 
 class ReplayBufferDoubleRewardEpisodes(IterableDataset): #object,
     """Buffer to store environment transitions."""
-    def __init__(self, lowdim_shape, obs_shape, action_shape, episodes, episode_length, image_pad, device):
+    def __init__(self, obs_shape, action_shape, episodes, episode_length, image_pad, device):
         self.numEpisodes = episodes
         self.device = device
         self.episodeLength = episode_length
-        self.lowdim_shape = lowdim_shape
+        # self.lowdim_shape = lowdim_shape
         self.obs_shape = obs_shape
         self.action_shape = action_shape
         self.image_pad = image_pad
@@ -168,7 +168,7 @@ class ReplayBufferDoubleRewardEpisodes(IterableDataset): #object,
 
 
     def add(self, episode_list, priority = None):
-        episode_object = SingleEpisode(self.episodeLength, self.lowdim_shape, self.obs_shape, self.action_shape, self.image_pad, self.device)
+        episode_object = SingleEpisode(self.episodeLength, self.obs_shape, self.action_shape, self.image_pad, self.device)
         episode_object.add(episode_list)
         if priority is not None:
             episode_object.setPriority(priority)
@@ -194,9 +194,9 @@ class ReplayBufferDoubleRewardEpisodes(IterableDataset): #object,
                 index = np.random.randint(0,
                                      self.trainprop * (self.numEpisodes if self.full else self.idx))
 
-        lowdim, obses, actions, rewards, next_lowdim, next_obses, not_dones_no_max = self.allEpisodes[index].sample_rollout_episode(self.length, self.shaped_rewards, correctionsOnly = self.correctionsOnly)
+        obses, actions, rewards, next_obses, not_dones_no_max = self.allEpisodes[index].sample_rollout_episode(self.length, self.shaped_rewards, correctionsOnly = self.correctionsOnly)
 
-        return lowdim, obses, actions, rewards, next_lowdim, next_obses, not_dones_no_max
+        return obses, actions, rewards, next_obses, not_dones_no_max
 
 
     def __iter__(self):

@@ -178,7 +178,7 @@ class Workspace(object):
                 
 
                 # Random because we don't use it
-                lowdim = np.random.rand(130)
+                # lowdim = np.random.rand(130)
                 reward = 0.
                 next_lowdim = np.random.rand(130)
                 next_obs = np.random.randint(low=0, high=255, size=(9, IMG_WIDTH, IMG_HEIGHT)).astype('uint8')
@@ -188,11 +188,11 @@ class Workspace(object):
                 if cfg.audio:
                     audio_obs = self.get_audio_frames(waveforms, self.step)
                     next_audio = np.random.rand(57, 160)
-                    buffer_list.append((lowdim, obs, audio_obs, action, reward,
-                                    (1.0 if self.step > cfg.sparseProp * cfg.episodeLength else 0.0), next_lowdim, next_obs, next_audio, done, done_no_max))
+                    buffer_list.append((obs, audio_obs, action, reward,
+                                    (1.0 if self.step > cfg.sparseProp * cfg.episodeLength else 0.0), next_obs, next_audio, done, done_no_max))
                 else:
-                    buffer_list.append((lowdim, obs, action, reward,
-                                    (1.0 if self.step > cfg.sparseProp * cfg.episodeLength else 0.0), next_lowdim, next_obs, done, done_no_max))
+                    buffer_list.append((obs, action, reward,
+                                    (1.0 if self.step > cfg.sparseProp * cfg.episodeLength else 0.0), next_obs, done, done_no_max))
 
 
                 self.step += 1

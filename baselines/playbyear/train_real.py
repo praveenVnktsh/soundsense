@@ -108,7 +108,7 @@ class Workspace(object):
         self.device = torch.device(cfg.device)
         # self.env = make_env(cfg)
         dims = 13        # TODO: Hardcoded
-        cfg.agent.params.lowdim_dim = cfg.lowdim_stack *  dims
+        # cfg.agent.params.lowdim_dim = cfg.lowdim_stack *  dims
         debug("make env done")
         
         # obj_dict, lowdim, obs = self.env.reset() #let's mold our model to what the environment outputs

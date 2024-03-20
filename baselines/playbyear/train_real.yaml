@@ -101,7 +101,7 @@ agent:
     obs_shape: ??? # to be specified later
     action_shape: ??? # to be specified later
     action_range: ??? # to be specified later
-    lowdim_dim: ??? #to b e specified later
+    # lowdim_dim: ??? #to b e specified later
     device: ${device}
     encoder_cfg: ${encoder}
     critic_cfg: ${critic}
@@ -139,7 +139,7 @@ encoder:
   params:
       obs_shape: ${agent.params.obs_shape}
       feature_dim: 50 #used to be 50
-      lowdim_dim: ${agent.params.lowdim_dim}
+      # lowdim_dim: ${agent.params.lowdim_dim}
       num_layers: 4
       num_filters: 32
       output_dim: 35

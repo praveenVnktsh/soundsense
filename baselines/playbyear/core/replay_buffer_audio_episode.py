@@ -13,11 +13,11 @@ import random
 import copy
 
 class SingleEpisode():
-    def __init__(self, episode_length, lowdim_shape, obs_shape, audio_shape, action_shape, image_pad, device):
+    def __init__(self, episode_length, obs_shape, audio_shape, action_shape, image_pad, device):
         self.episode_length = episode_length
 
-        self.lowdim = np.empty((episode_length, *lowdim_shape), dtype=np.float32)
-        self.next_lowdim = np.empty((episode_length, *lowdim_shape), dtype=np.float32)
+        # self.lowdim = np.empty((episode_length, *lowdim_shape), dtype=np.float32)
+        # self.next_lowdim = np.empty((episode_length, *lowdim_shape), dtype=np.float32)
 
         self.audio = np.empty((episode_length, *audio_shape), dtype=np.float32)
         self.next_audio = np.empty((episode_length, *audio_shape), dtype=np.float32)
@@ -43,7 +43,7 @@ class SingleEpisode():
 
     def _add(self, lowdim, obs, audio,action, shaped_reward, sparse_reward, next_lowdim, next_obs, next_audio, done, done_no_max):
         assert self.idx < self.episode_length, "something's wrong! You added too much data "
-        np.copyto(self.lowdim[self.idx], lowdim)
+        # np.copyto(self.lowdim[self.idx], lowdim)
         np.copyto(self.obses[self.idx], obs)
         np.copyto(self.actions[self.idx], action)
         np.copyto(self.audio[self.idx], audio)
@@ -51,7 +51,7 @@ class SingleEpisode():
         np.copyto(self.sparse_rewards[self.idx], sparse_reward)
         np.copyto(self.next_audio[self.idx], next_audio)
         np.copyto(self.next_obses[self.idx], next_obs)
-        np.copyto(self.next_lowdim[self.idx], next_lowdim)
+        # np.copyto(self.next_lowdim[self.idx], next_lowdim)
         np.copyto(self.not_dones[self.idx], not done)
         np.copyto(self.not_dones_no_max[self.idx], not done_no_max)
         self.idx = self.idx + 1
@@ -70,10 +70,10 @@ class SingleEpisode():
         startIdx = index
 
         #padding allows for the sampling of initial actions
-        padded_lowdim = np.pad(self.lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
-        padded_next_lowdim = np.pad(self.next_lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
-        lowdim = padded_lowdim[startIdx:startIdx + length]
-        next_lowdim = padded_next_lowdim[startIdx:startIdx + length]
+        # padded_lowdim = np.pad(self.lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
+        # padded_next_lowdim = np.pad(self.next_lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
+        # lowdim = padded_lowdim[startIdx:startIdx + length]
+        # next_lowdim = padded_next_lowdim[startIdx:startIdx + length]
 
         padded_obses = np.pad(self.obses, ((length - 1, 0), (0, 0), (0, 0), (0, 0)), "edge")
         padded_next_obses = np.pad(self.next_obses, ((length - 1, 0), (0, 0), (0, 0), (0, 0)), "edge")
@@ -98,7 +98,7 @@ class SingleEpisode():
         padded_not_dones = np.pad(self.not_dones, ((length - 1, 0), (0, 0)), "edge")
         not_dones = padded_not_dones[startIdx:startIdx + length]
 
-        return lowdim, obses, audio, actions, shaped_rewards, sparse_rewards, next_lowdim, next_obses, next_audio, not_dones_no_max
+        return obses, audio, actions, shaped_rewards, sparse_rewards, next_obses, next_audio, not_dones_no_max
 
     def sample_rollout(self, length, shaped_rewards = True, correctionsOnly = False):
         if correctionsOnly:
@@ -116,10 +116,10 @@ class SingleEpisode():
 #             startIdx += (length - 1)
 
         startIdx = np.random.randint(0, self.episode_length)
-        padded_lowdim = np.pad(self.lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
-        padded_next_lowdim = np.pad(self.next_lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
-        lowdim = padded_lowdim[startIdx:startIdx + length]
-        next_lowdim = padded_next_lowdim[startIdx:startIdx + length]
+        # padded_lowdim = np.pad(self.lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
+        # padded_next_lowdim = np.pad(self.next_lowdim, ((length - 1, 0), (0, 0), (0, 0)), "edge")
+        # lowdim = padded_lowdim[startIdx:startIdx + length]
+        # next_lowdim = padded_next_lowdim[startIdx:startIdx + length]
 
         padded_obses = np.pad(self.obses, ((length - 1, 0), (0, 0), (0, 0), (0, 0)), "edge")
         padded_next_obses = np.pad(self.next_obses, ((length - 1, 0), (0, 0), (0, 0), (0, 0)), "edge")
@@ -143,7 +143,7 @@ class SingleEpisode():
         padded_not_dones = np.pad(self.not_dones, ((length - 1, 0), (0, 0)), "edge")
         not_dones = padded_not_dones[startIdx:startIdx + length]
 
-        return lowdim, obses, audio, actions, rewards, next_lowdim, next_obses, next_audio, not_dones_no_max
+        return obses, audio, actions, rewards, next_obses, next_audio, not_dones_no_max
 
 class ReplayBufferAudioEpisodes(IterableDataset):
     """Buffer to store environment transitions."""
@@ -190,7 +190,7 @@ class ReplayBufferAudioEpisodes(IterableDataset):
 
 
     def add(self, episode_list, priority = None):
-        episode_object = SingleEpisode(len(episode_list), self.lowdim_shape, self.obs_shape, self.audio_shape, self.action_shape, self.image_pad, self.device)
+        episode_object = SingleEpisode(len(episode_list), self.obs_shape, self.audio_shape, self.action_shape, self.image_pad, self.device)
         print("this demo is length ", len(episode_list))
         episode_object.add(episode_list)
         if priority is not None:
@@ -214,11 +214,11 @@ class ReplayBufferAudioEpisodes(IterableDataset):
             index = np.random.randint(0,
                                  self.trainprop * (self.numEpisodes if self.full else self.idx))
 
-        lowdim, obses, audio, actions, rewards, next_lowdim, \
+        obses, audio, actions, rewards, \
             next_obses, next_audio, not_dones_no_max = self.allEpisodes[index].sample_rollout(self.length,
                                                                                               self.shaped_rewards, correctionsOnly = self.correctionsOnly)
 
-        return lowdim, obses, audio, actions, rewards, next_lowdim, next_obses, next_audio, not_dones_no_max
+        return obses, audio, actions, rewards, next_obses, next_audio, not_dones_no_max
 
     def __iter__(self):
         while True:
