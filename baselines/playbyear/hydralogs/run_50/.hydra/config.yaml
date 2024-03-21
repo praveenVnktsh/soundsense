@@ -5,8 +5,9 @@ agent:
   params:
     action_range: ???
     action_shape: ???
-    lowdim_dim: ???
     obs_shape: ???
+append_file: /home/punygod_admin/SoundSense/soundsense/data/playbyear_pkls/pbe_44.pkl
+append_mode: false
 audio: false
 batch_size: 128
 cameraName: agentview_image

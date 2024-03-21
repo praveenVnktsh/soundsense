@@ -27,7 +27,6 @@ agent:
     encoder_cfg: ${encoder}
     init_temperature: 0.1
     log_frequency: 20
-    lowdim_dim: ???
     lr: ${lr}
     obs_shape: ???
 balanced_batches: false
@@ -43,14 +42,13 @@ critic:
     encoder_cfg: ${agent.params.encoder_cfg}
     hidden_depth: 2
     hidden_dim: 1024
-demo_file: pbe_94.pkl
+demo_file: pbe_1.pkl
 demo_root: /home/punygod_admin/SoundSense/soundsense/data/playbyear_pkls/
 device: cuda
 encoder:
   class: core.drq_memory.Encoder
   params:
     feature_dim: 50
-    lowdim_dim: ${agent.params.lowdim_dim}
     num_filters: 32
     num_layers: 4
     obs_shape: ${agent.params.obs_shape}

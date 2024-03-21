@@ -77,7 +77,7 @@ hydra:
         kv_sep: '='
     config_file: writeDemos_episodes.yaml
     id: ???
-    name: writeDemos_episodes
+    name: writeDemos_episodes_teleop
     num: ???
     override_dirname: ''
   job_logging:

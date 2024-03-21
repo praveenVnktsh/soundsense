@@ -27,7 +27,6 @@ agent:
     encoder_cfg: ${encoder}
     init_temperature: 0.1
     log_frequency: 20
-    lowdim_dim: ???
     lr: ${lr}
     obs_shape: ???
 balanced_batches: false
@@ -43,8 +42,8 @@ critic:
     encoder_cfg: ${agent.params.encoder_cfg}
     hidden_depth: 2
     hidden_dim: 1024
-demo_file: pbe_audio.pkl
-demo_root: /home/punygod_admin/SoundSense/soundsense/data/run3/
+demo_file: pbe_audio_${number_demos}.pkl
+demo_root: /home/punygod_admin/SoundSense/soundsense/data/playbyear_pkls/
 device: cuda
 encoder:
   class: core.drq_audio_memory.Encoder
@@ -53,7 +52,6 @@ encoder:
     audio_feature_dim: 10
     audio_steps: 57
     feature_dim: 50
-    lowdim_dim: ${agent.params.lowdim_dim}
     num_filters: 32
     num_layers: 4
     obs_shape: ${agent.params.obs_shape}
@@ -61,7 +59,7 @@ encoder:
     output_logits: false
 env: drq-robosuite
 environmentName: IndicatorBoxBlock
-eval_frequency: 10000
+eval_frequency: 50
 eval_only: false
 expert_workers: 4
 frame_stack: 3
@@ -83,7 +81,7 @@ modalities:
 num_eval_episodes: 20
 num_seed_steps: 1000
 num_train_iters: 1
-num_train_steps: 110000
+num_train_steps: 100
 number_demos: 1
 orig_seed: ${seed}
 priority: true
