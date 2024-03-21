@@ -3,7 +3,7 @@ import glob
 
 os.makedirs('../data/processed', exist_ok=True)
 
-for path in glob.glob('../data/videos/*'):
+for path in glob.glob('../data/raw_data/obsdata/*'):
     filename = os.path.basename(path)
     basename = filename.split('.')[0]
     print(basename)
