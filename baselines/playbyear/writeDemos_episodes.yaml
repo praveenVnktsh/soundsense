@@ -34,7 +34,7 @@ stacked: true
 audio: false
 
 #Other hyperparameters
-episodes: 1  ##### CHANGE this to required no. of episodes to save in pkl #####
+episodes: 76  ##### CHANGE this to required no. of episodes to save in pkl #####
 episodeLength: 500 #150 for occluded block, 250 for pick place
 recordFrq: 10
 sparseProp: 0.75 #what proportion of rewards will be 0 (the rest will be 1)

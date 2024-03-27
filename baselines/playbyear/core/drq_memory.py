@@ -102,6 +102,8 @@ class Actor(nn.Module):
         self.encoder = hydra.utils.instantiate(encoder_cfg)
         self.log_std_bounds = log_std_bounds
 
+        # self.trunk = utils.mlp(self.encoder.feature_dim, hidden_dim,
+        #            action_shape[0], hidden_depth)
         self.trunk = utils.mlp(self.encoder.feature_dim, hidden_dim,
                    2 * action_shape[0], hidden_depth)
         self.memory_cells = nn.LSTM(self.encoder.feature_dim,self.encoder.feature_dim, batch_first = True )
@@ -146,6 +148,7 @@ class Actor(nn.Module):
         self.outputs['std'] = std
         dist = utils.SquashedNormal(mu, std)
         return dist
+
 
     def log(self, logger, step):
         self.encoder.log(logger, step)
@@ -266,8 +269,12 @@ class DRQAgent(object):
     def update_actor_bc(self, obs, logger, step, action, squash = True): #only for pure BC
         dist = self.actor(obs, detach_encoder=False, squashed = squash)
         agent_action = dist.mean
-        loss = nn.MSELoss()
+        # print("pred action: ", agent_action[0])
+        # loss = nn.MSELoss()
+        loss = nn.CrossEntropyLoss()
         action = action[:, -1, :] #pick last action to compare to
+        # print("gt action: ", action[0])
+        
         # print("Before loss calc. predicted action: ", agent_action, "actual action: ", action)
         actor_loss = loss(agent_action, action)
         # print("After loss calc. actor_loss:", actor_loss)
@@ -323,6 +330,7 @@ class DRQAgent(object):
     def update_bc(self, replay_buffer, logger, step, squash = True):
         t0 = time.time()
         obs, action, reward, next_obses, not_dones_no_max= next(replay_buffer)
+        # print("gt action: ", action)
         t1 = time.time()
         obs, action, _, _ = self.to_tensor(obs, action)
         t2 = time.time()

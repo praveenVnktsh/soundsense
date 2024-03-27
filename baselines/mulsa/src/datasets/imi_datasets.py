@@ -114,7 +114,7 @@ class ImitationEpisode(EpisodeDataset):
             cam_gripper_framestack = torch.stack(
                 [
                     self.transform_cam(
-                        self.load_image(self.trial, "frames", timestep)
+                        self.load_image(self.trial, "video", timestep)
                     )
                     for timestep in frame_idx
                 ],
@@ -125,7 +125,7 @@ class ImitationEpisode(EpisodeDataset):
         if self.train:
             # print("idx_in_getitem_train", idx)
             img = self.transform_cam(
-                self.load_image(self.trial, "frames", idx)
+                self.load_image(self.trial, "video", idx)
             )
             if not self.nocrop:
                 i_v, j_v, h_v, w_v = T.RandomCrop.get_params(

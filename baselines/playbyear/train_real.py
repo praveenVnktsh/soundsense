@@ -120,7 +120,7 @@ class Workspace(object):
 
         #setting the appropiate configuration parameters
         # cfg.agent.params.action_shape = self.env.action_space.shape
-        cfg.agent.params.action_shape = (5,)                # TODO: Hardcoded
+        cfg.agent.params.action_shape = (11,)                # TODO: Hardcoded
         # cfg.agent.params.action_range = [
         #     float(self.env.action_space.low.min()),
         #     float(self.env.action_space.high.max())

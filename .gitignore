@@ -6,3 +6,7 @@ data/
 *.pkl
 *.ckpt
 *.pt
+baselines/mulsa/exp*
+baselines/playbyear/Results/
+baselines/playbyear/hydralogs/
+baselines/transformer/vit_weights.pth

@@ -142,22 +142,25 @@ class Workspace(object):
 
 
     def real_data(self, cfg, root_dir):
-        runs = sorted(glob.glob(root_dir+"run_*/"))
+        runs = sorted(glob.glob(root_dir+"*/"))
         for run in runs:
+            print("At run: ", run)
             buffer_list = list()
             images_path = run + "video/"
             audio_path  = run + "processed_audio.wav"
             # 1711051394806730
 
-            action_path = run + "keyboard_teleop.json"
+            action_path = run + "actions.json"
             episodeLength = len(glob.glob(images_path+"*.png"))
             
             waveforms = sf.read(audio_path)[0]
 
             action_np = np.array(json.load(open(action_path)))
+            if len(action_np) == 0:
+                continue
             # For now since lengths are different
             actions_idx = np.arange(min(action_np.shape[0], episodeLength*30//10), step=3)
-            action_np = action_np[actions_idx, :]       
+            action_np = action_np[actions_idx, :]    
             episodeLength = min(episodeLength, action_np.shape[0])
 
             self.step = 3
@@ -183,17 +186,19 @@ class Workspace(object):
                     buffer_list.append((obs, audio_obs, action, reward,
                                     (1.0 if self.step > cfg.sparseProp * cfg.episodeLength else 0.0), next_obs, next_audio, done, done_no_max))
                 else:
+                    # print("action saved: ", action)   
                     buffer_list.append((obs, action, reward,
                                     (1.0 if self.step > cfg.sparseProp * cfg.episodeLength else 0.0), next_obs, done, done_no_max))
                 self.step += 1
                 pbar.update(1)
             pbar.close()
             self.replay_buffer.add(buffer_list)
+            self.replay_buffer.end_add()
             print("****** ADDED ****** and we are at ", self.replay_buffer.idx)
 
 
     def run(self, cfg):
-        root_dir = '/home/punygod_admin/SoundSense/soundsense/data/playbyear_runs/'
+        root_dir = '/home/punygod_admin/SoundSense/soundsense/data/seventysix/data/'
         self.real_data(cfg, root_dir)
         write_path = "/home/punygod_admin/SoundSense/soundsense/data/playbyear_pkls/pbe"
         if cfg.audio:

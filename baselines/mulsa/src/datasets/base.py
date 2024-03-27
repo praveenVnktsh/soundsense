@@ -41,6 +41,7 @@ class EpisodeDataset(Dataset):
 
         def load(file):
             fullpath = os.path.join(trial, file)
+            # print("fullpath", fullpath)
             if os.path.exists(fullpath):
                 return sf.read(fullpath)[0]
             else:
@@ -57,19 +58,19 @@ class EpisodeDataset(Dataset):
         if train:
             train_csv = pd.read_csv(args.train_csv, header=None)[0]
             eps_ = str(train_csv.iloc[idx])
-            with open(os.path.join("/home/punygod_admin/SoundSense/soundsense/data/processed", eps_[4:] + ".json")) as ts:
+            with open(os.path.join("/home/punygod_admin/SoundSense/soundsense/data/mulsa/data", eps_ + "/actions.json")) as ts:
                 timestamps = json.load(ts)
         else:
             val_csv = pd.read_csv(args.val_csv, header=None)[0]
             eps_ = str(val_csv.iloc[idx])
-            with open(os.path.join("/home/punygod_admin/SoundSense/soundsense/data/processed", eps_[4:] + ".json")) as ts:
+            with open(os.path.join("/home/punygod_admin/SoundSense/soundsense/data/mulsa/data", eps_ + "/actions.json")) as ts:
                 timestamps = json.load(ts)
 
         trial = os.path.join(self.data_folder, eps_)
         timestamps = timestamps[::3]
 
         if "ag" in modes:
-            audio_gripper1 = load(os.path.join("audio", "audio.wav"))
+            audio_gripper1 = load(os.path.join("processed_audio.wav"))
 
             # audio_gripper_left = audio_gripper1[:,0]
             # audio_gripper_right = audio_gripper1[:,1]
@@ -83,7 +84,9 @@ class EpisodeDataset(Dataset):
             ]
             # print("ag", torch.tensor(audio_gripper).shape) #(434176, 2)
             audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
-            audio_gripper = (audio_gripper.T[0,:]).reshape(1,-1)
+            # print("ag1", audio_gripper.shape) #(434176, 2)
+            # audio_gripper = (audio_gripper.T[0,:]).reshape(1,-1)
+            audio_gripper = (audio_gripper).reshape(1,-1)
             # print("ag1", audio_gripper.shape) #(434176, 2)
         else:
             audio_gripper = None

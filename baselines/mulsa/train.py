@@ -29,8 +29,8 @@ def strip_sd(state_dict, prefix):
 
 
 def main(args):
-    train_csv = pd.read_csv(args.train_csv)
-    val_csv = pd.read_csv(args.val_csv)
+    train_csv = pd.read_csv(args.train_csv, header=None)
+    val_csv = pd.read_csv(args.val_csv, header=None)
     ## write code to split train test from total TODO    
     if args.num_episode is None:
         train_num_episode = len(train_csv)
@@ -38,7 +38,7 @@ def main(args):
     else:
         train_num_episode = args.num_episode
         val_num_episode = args.num_episode
-
+    print(train_csv.head(), val_csv.head())
     train_set = torch.utils.data.ConcatDataset(
         [
             ImitationEpisode(args, i, args.data_folder)
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     # data
     p.add("--train_csv", default="src/datasets/data/train.csv")
     p.add("--val_csv", default="src/datasets/data/val.csv")
-    p.add("--data_folder", default="../../data/playbyear_runs")
+    p.add("--data_folder", default="../../data/mulsa/data")
     p.add("--resized_height_v", required=True, type=int)
     p.add("--resized_width_v", required=True, type=int)
     p.add("--resized_height_t", required=True, type=int)

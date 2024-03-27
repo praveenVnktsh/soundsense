@@ -62,6 +62,20 @@ class SingleEpisode():
             self._add(*step)
         # assert self.idx % self.episode_length == 0            # TODO uncomment
 
+    def end_add(self):
+        # Truncate the arrays to the correct length
+        # self.lowdim = self.lowdim[:self.idx]
+        # self.next_lowdim = self.next_lowdim[:self.idx]
+        self.obses = self.obses[:self.idx]
+        self.next_obses = self.next_obses[:self.idx]
+        self.actions = self.actions[:self.idx]
+        self.shaped_rewards = self.shaped_rewards[:self.idx]
+        self.sparse_rewards = self.sparse_rewards[:self.idx]
+        self.not_dones = self.not_dones[:self.idx]
+        self.not_dones_no_max = self.not_dones_no_max[:self.idx]
+        self.episode_length = self.idx
+
+
     def setPriority(self, priority):
         self.priorities = priority
 
@@ -131,6 +145,8 @@ class SingleEpisode():
 
         padded_actions = np.pad(self.actions, ((length - 1, 0), (0, 0)), "edge")
         actions = padded_actions[startIdx:startIdx + length]
+        # actions = self.actions[startIdx]
+        # print("action saved: ", actions[0])   
 
         reward_buffer = self.shaped_rewards if shaped_rewards else self.sparse_rewards
         padded_reward_buffer = np.pad(reward_buffer, ((length - 1, 0), (0, 0)), "edge")
@@ -194,11 +210,14 @@ class ReplayBufferDoubleRewardEpisodes(IterableDataset): #object,
                 index = np.random.randint(0,
                                      self.trainprop * (self.numEpisodes if self.full else self.idx))
 
+        # print("episode index: ", index)
         obses, actions, rewards, next_obses, not_dones_no_max = self.allEpisodes[index].sample_rollout_episode(self.length, self.shaped_rewards, correctionsOnly = self.correctionsOnly)
 
         return obses, actions, rewards, next_obses, not_dones_no_max
 
-
+    def end_add(self):
+        for episode in self.allEpisodes:
+            episode.end_add()
     def __iter__(self):
         while True:
             yield self.sampleRollout()

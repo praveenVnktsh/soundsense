@@ -42,8 +42,8 @@ system: sim #sim for the mujoco stuff, and "real" for franka
 
 #####RUN CHANGES HERE ############
 #core adjustements
-seed: 1
-number_demos: 50 ##### CHANGES THIS to match number of episodes stored in pkl #####
+seed: 2
+number_demos: 1 ##### CHANGES THIS to match number of episodes stored in pkl #####
 demo_file: pbe_${number_demos}.pkl
 stack: 10 # history
 

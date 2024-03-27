@@ -34,7 +34,8 @@ class ImiEngine(LightningModule):
     #     return immi_loss + aux_loss * self.config.aux_multiplier, immi_loss, aux_loss
     def compute_loss(self, xyz_gt, xyz_pred):
         # print(xyz_gt.shape, xyz_pred.shape)
-        loss = F.mse_loss(xyz_gt, xyz_pred)
+        # loss = F.mse_loss(xyz_gt, xyz_pred)
+        loss = self.loss_cce(xyz_pred, xyz_gt)
         return loss
 
     def training_step(self, batch, batch_idx):
