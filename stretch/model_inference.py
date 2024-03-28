@@ -11,6 +11,7 @@ from models.baselines.mulsa.src.inference import MULSAInference
 
 sys.path.append("")
 
+HISTORY_LEN = 10
 
 # Model:
 # extension+, extension-, base-, base+, gripper+, gripper-, lift+, lift-, roll-, roll+, no_action
@@ -71,6 +72,21 @@ def get_image(cap):
         return None
     return torch.tensor(np.expand_dims(np.array(frame).transpose(2, 0, 1), (0, 1))).float()
 
+def get_image_history(cap, history, history_len):
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            return None
+        history.append(frame)
+
+        if len(history) > history_len:
+            history.pop(0)
+        
+        if len(history) == history_len:
+            break
+    
+    return torch.tensor(np.expand_dims(np.array(history).transpose(0, 3, 1, 2), (0))).float()
+        
 
 def run_loop(model):
     is_run = True
@@ -80,16 +96,17 @@ def run_loop(model):
     
     loop_rate = 1
     loop_start_time = time.time()
-
+    history = []
     while is_run:
         if time.time() - start_time > 10:
             is_run = False
 
         if time.time() - loop_start_time > 1/loop_rate:
             loop_start_time = time.time()
-            frame = get_image(cap)
-            if frame is not None:
-                action = convert_to_action(model, frame)
+            # frame = get_image(cap)
+            history = get_image_history(cap, history, HISTORY_LEN)
+            if history is not None:
+                action = convert_to_action(model, history)
                 execute_action(r, action)
                 print("action:  ",action)
             else:
