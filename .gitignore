@@ -3,6 +3,8 @@ data/calib*
 *.MP4
 *.mp4
 *.pth
+*.zip
+*.ckpt
 data/
 baselines/cnnlstm/lightning_logs/
 baselines/cnn/lightning_logs/
