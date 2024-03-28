@@ -2,11 +2,10 @@
 data/calib*
 *.MP4
 *.mp4
+*.pth
 data/
-*.pkl
-*.ckpt
-*.pt
+baselines/cnnlstm/lightning_logs/
+baselines/cnn/lightning_logs/
 baselines/mulsa/exp*
 baselines/playbyear/Results/
 baselines/playbyear/hydralogs/
-baselines/transformer/vit_weights.pth
