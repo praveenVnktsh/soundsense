@@ -3,9 +3,9 @@ import torch
 import stretch_body.robot
 import time
 import cv2
-from soundsense.baselines.cnn.model import LitModel
+from soundsense.baselines.playbyear.core.drq_memory import DRQAgent
 
-def convert_to_action(model, inp):
+def convert_to_action(agent, inp):
     # action_space = [del_extension, del_height, del_lateral, del_roll, del_gripper]
     limits = [
         [-0.05, 0.05],
@@ -14,7 +14,8 @@ def convert_to_action(model, inp):
         [-10*np.pi/180, 10 * np.pi/180],
         [20, 100]
     ]
-    outputs = model(inp) # 5x1
+    outputs = agent.actor(inp).mean # 11x1
+    print(outputs.shape)
     for i in range(len(limits)):
         outputs[i] = outputs[i] * (limits[i][1] - limits[i][0]) + limits[i][0]
 
@@ -91,6 +92,6 @@ if __name__ == "__main__":
     
 
 
-    model = LitModel.load_from_checkpoint("/home/punygod_admin/SoundSense/soundsense/baselines/cnn/lightning_logs/version_16/checkpoints/epoch=872-step=17460.ckpt")
+    model = CNN()
     run_loop(model)
     r.stop()
