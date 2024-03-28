@@ -11,7 +11,7 @@ from models.baselines.mulsa.src.inference import MULSAInference
 
 sys.path.append("")
 
-HISTORY_LEN = 10
+HISTORY_LEN = 3
 
 # Model:
 # extension+, extension-, base-, base+, gripper+, gripper-, lift+, lift-, roll-, roll+, no_action
@@ -54,7 +54,9 @@ def convert_to_action(model, inp):
         [-0.05, 0.05], # lift
         [-10*np.pi/180, 10 * np.pi/180] # roll
     ]
-    outputs = model(inp) # 11x1
+    print("before model inp")
+    outputs = model(inp)[-1].reshape(-1,1) # 11x1
+    print("output shape", outputs.shape)
     action_idx = torch.argmax(outputs)
     lookup_copy = copy.deepcopy(lookup)
     outputs = lookup_copy[int(action_idx)]
@@ -75,17 +77,20 @@ def get_image(cap):
 def get_image_history(cap, history, history_len):
     while True:
         ret, frame = cap.read()
+        # print(type(frame))
         if not ret:
             return None
-        history.append(frame)
+        # print("frame before append", torch.tensor(frame).unsqueeze(0).unsqueeze(0).permute(0,1,4,2,3).size())
+        history = torch.cat((history, torch.tensor(frame).unsqueeze(0).unsqueeze(0).permute(0,1,4,2,3)), 1)
+        # print("history after append", history.size())
 
-        if len(history) > history_len:
-            history.pop(0)
+        if history.size(1) > history_len:
+            history = history[:,1:,:,:,:]
         
-        if len(history) == history_len:
+        if history.size(1) == history_len:
             break
     
-    return torch.tensor(np.expand_dims(np.array(history).transpose(0, 3, 1, 2), (0))).float()
+    return history.float()
         
 
 def run_loop(model):
@@ -96,14 +101,15 @@ def run_loop(model):
     
     loop_rate = 1
     loop_start_time = time.time()
-    history = []
+    history = torch.zeros(size=(1,1,3,720,1280))
+    print("start loop")
     while is_run:
         if time.time() - start_time > 10:
             is_run = False
 
         if time.time() - loop_start_time > 1/loop_rate:
             loop_start_time = time.time()
-            # frame = get_image(cap)
+            # history = get_image(cap)
             history = get_image_history(cap, history, HISTORY_LEN)
             if history is not None:
                 action = convert_to_action(model, history)
