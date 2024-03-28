@@ -11,6 +11,25 @@ from models.baselines.mulsa.src.inference import MULSAInference
 
 sys.path.append("")
 
+
+# Model:
+# extension+, extension-, base-, base+, gripper+, gripper-, lift+, lift-, roll-, roll+, no_action
+# Map to:
+# extension, base, gripper, lift, roll
+
+# 0: [1, 0.5, 0.5, 0.5, 0.5]
+# 1: [0, 0.5, 0.5, 0.5, 0.5]
+# 2: [0.5, 0, 0.5, 0.5, 0.5]
+# 3: [0.5, 1, 0.5, 0.5, 0.5]
+# 4: [0.5, 0.5, 1, 0.5, 0.5]
+# 5: [0.5, 0.5, 0, 0.5, 0.5]
+# 6: [0.5, 0.5, 0.5, 1, 0.5]
+# 7: [0.5, 0.5, 0.5, 0, 0.5]
+# 8: [0.5, 0.5, 0.5, 0.5, 0]
+# 9: [0.5, 0.5, 0.5, 0.5, 1]
+
+# 0.1, 0.2, 0.1, 0.3, -0.1, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1
+# --------| --------| ---------| --------| --------| ---
 lookup = {
     0: [1., 0.5, 0.5, 0.5, 0.5],
     1: [0., 0.5, 0.5, 0.5, 0.5],
@@ -44,24 +63,8 @@ def convert_to_action(model, inp):
         outputs[i] = outputs[i] * (limits[i][1] - limits[i][0]) + limits[i][0]
     return outputs
 
-# Model:
-# extension+, extension-, base-, base+, gripper+, gripper-, lift+, lift-, roll-, roll+, no_action
-# Map to:
-# extension, base, gripper, lift, roll
 
-# 0: [1, 0.5, 0.5, 0.5, 0.5]
-# 1: [0, 0.5, 0.5, 0.5, 0.5]
-# 2: [0.5, 0, 0.5, 0.5, 0.5]
-# 3: [0.5, 1, 0.5, 0.5, 0.5]
-# 4: [0.5, 0.5, 1, 0.5, 0.5]
-# 5: [0.5, 0.5, 0, 0.5, 0.5]
-# 6: [0.5, 0.5, 0.5, 1, 0.5]
-# 7: [0.5, 0.5, 0.5, 0, 0.5]
-# 8: [0.5, 0.5, 0.5, 0.5, 0]
-# 9: [0.5, 0.5, 0.5, 0.5, 1]
 
-# 0.1, 0.2, 0.1, 0.3, -0.1, 0.3, 0.5, 0.3, 0.2, 0.2, 0.1
-# --------| --------| ---------| --------| --------| ---
 def get_image(cap):
     ret, frame = cap.read()
     if not ret:
@@ -134,6 +137,5 @@ if __name__ == "__main__":
 
     # model = MULSAInference.load_from_checkpoint("/home/hello-robot/soundsense/soundsense/stretch/models/baselines/mulsa/03272024_205921_last.ckpt")
     model = CNNLSTMWithResNetForActionPrediction.load_from_checkpoint("/home/hello-robot/soundsense/soundsense/stretch/models/baselines/cnnlstm/epoch=28-step=8352.ckpt")
-
     run_loop(model)
     r.stop()

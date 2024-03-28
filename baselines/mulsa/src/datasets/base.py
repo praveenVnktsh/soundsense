@@ -116,7 +116,7 @@ class EpisodeDataset(Dataset):
         if timestep == -1:
             timestep = 0
         # print(timestep)
-        img_path = os.path.join(trial, stream, str(timestep+1).zfill(leading_zeros) + ".png")
+        img_path = os.path.join(trial, stream, str(timestep+1).zfill(leading_zeros ) + ".png")
         image = (
             torch.as_tensor(np.array(Image.open(img_path))).float().permute(2, 0, 1)
             / 255
