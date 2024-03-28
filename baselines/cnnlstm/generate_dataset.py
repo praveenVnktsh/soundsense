@@ -97,8 +97,13 @@ class Workspace():
         runs = sorted(glob.glob(root_dir+"*/"))
         n_bufs = 0
         for i, run in enumerate(runs):
-            if i < 40:
-                continue
+            buffer = {
+                "audio_obs": [],
+                "obs": [],
+                "actions": []
+            }
+            # if i < 40:
+            #     continue
             print("Processing ", run)
             images_path = run + "video/"
             audio_path  = run + "processed_audio.wav"
@@ -124,11 +129,16 @@ class Workspace():
                     audio_obs = self.get_audio_frames(waveforms, delta_from_start, prev_seconds = 2)
                 except:
                     continue
-                self.buffer.append((
-                        audio_obs,
-                        obs,
-                        action,
-                    ))
+                obs = torch.tensor(obs).squeeze().float()
+                obs -= 128
+                obs /= 128
+                # obs = obs.permute(1, 2, 0)
+                
+                action = torch.tensor(action).long()
+                
+                buffer["actions"].append(action)
+                buffer["obs"].append(obs)
+                buffer["audio_obs"].append(audio_obs)
                 self.step += 1
                 pbar.update(1)
             pbar.close()
@@ -138,11 +148,18 @@ class Workspace():
                 stringg = 'audio'
             else:
                 stringg = 'video'
-            write_path = f"/home/punygod_admin/SoundSense/soundsense/data/cnn_baseline_data/{stringg}/data_{n_bufs}.pkl"
-            print("Writing Buffer of length = ", len(self.buffer))
-            pkl.dump(self.buffer, open(write_path, "wb" ), protocol=4 )
+
+            write_path = f"/home/punygod_admin/SoundSense/soundsense/data/cnn_baseline_data/{stringg}/" 
             n_bufs += 1
             self.buffer = []
+            buffer['obs'] = torch.stack(buffer['obs'], dim=0)
+            buffer['audio_obs'] = torch.stack(buffer['audio_obs'], dim=0)
+            buffer['actions'] = torch.stack(buffer['actions'], dim=0)
+            torch.save(buffer['obs'], write_path + 'video/' + f"data_{n_bufs}.pt")
+            torch.save(buffer['audio_obs'], write_path + 'audio/' + f"data_{n_bufs}.pt")
+            torch.save(buffer['actions'], write_path + 'actions/' + f"data_{n_bufs}.pt")
+            with open(write_path + f"metadata/data_{n_bufs}.txt", "w") as f:
+                f.write(f"{len(buffer['obs'])}")
 
 
 
@@ -152,7 +169,11 @@ class Workspace():
         self.real_data(root_dir)
 
 def main():
-    
+    import os
+    os.makedirs('/home/punygod_admin/SoundSense/soundsense/data/cnn_baseline_data/audio/actions/', exist_ok=True)
+    os.makedirs('/home/punygod_admin/SoundSense/soundsense/data/cnn_baseline_data/audio/audio/', exist_ok=True)
+    os.makedirs('/home/punygod_admin/SoundSense/soundsense/data/cnn_baseline_data/audio/video/', exist_ok=True)
+    os.makedirs('/home/punygod_admin/SoundSense/soundsense/data/cnn_baseline_data/audio/metadata/', exist_ok=True)
     workspace = Workspace(True)
     print("Starting")
     workspace.run()

@@ -295,6 +295,8 @@ class DRQAgent(object):
             logger.log('train_actor/loss', actor_loss, step)
             logger.log('train_actor/old_loss', old_loss, step)
             logger.log('train_actor/new_loss', new_loss, step)
+            logger.log('train_actor/lr', self.actor_optimizer.param_groups[0]['lr'], step)
+            logger.log('train_actor/batch_size', self.batch_size, step)
 
         # optimize the actor
         self.actor_optimizer.zero_grad()

@@ -67,7 +67,8 @@ class EpisodeDataset(Dataset):
                 timestamps = json.load(ts)
 
         trial = os.path.join(self.data_folder, eps_)
-        timestamps = timestamps[::3]
+        num_img_frames = len(os.listdir(os.path.join(trial, "video")))
+        # timestamps = timestamps[::3]
 
         if "ag" in modes:
             audio_gripper1 = load(os.path.join("processed_audio.wav"))
@@ -96,7 +97,7 @@ class EpisodeDataset(Dataset):
             trial,
             timestamps,
             audio_gripper,
-            len(timestamps), ##hardcoded
+            min(len(timestamps), num_img_frames) ##hardcoded
             # len(timestamps["action_history"]), TODO
         )
 
@@ -121,7 +122,7 @@ class EpisodeDataset(Dataset):
             / 255
         )
         # print(image.shape)
-        image = image[:,:,image.shape[2]//2:]
+        # image = image[:,:,image.shape[2]//2:]
         return image
 
     # @staticmethod
