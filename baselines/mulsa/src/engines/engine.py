@@ -41,6 +41,7 @@ class ImiEngine(LightningModule):
     def training_step(self, batch, batch_idx):
         # use idx in batch for debugging
         inputs, xyzgt_gt = batch
+        print("training_step input shape", inputs[0].size())
         xyzgt_pred, weights = self.actor(inputs)  # , idx)
         loss = self.compute_loss(xyzgt_gt, xyzgt_pred)
         self.log_dict(

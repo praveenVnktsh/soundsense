@@ -17,6 +17,7 @@ import pyaudio, alsaaudio
 sys.path.append("")
 
 HISTORY_LEN = 6
+AUDIO_HISTORY_LEN = 3 # seconds
 
 # Model:
 # extension+, extension-, base-, base+, gripper+, gripper-, lift+, lift-, roll-, roll+, no_action
@@ -48,18 +49,62 @@ lookup = {
     10: [0.5, 0.5, 0.5, 0.5, 0.5],
 }
 
-def convert_to_action(model, inp):
-    # action_space = [del_extension, del_height, del_lateral, del_roll, del_gripper]
-    limits = [
+limits = [
         [-0.05, 0.05], # extension
         [-0.05, 0.05], # base
         [-50, 50],      # gripper
         [-0.05, 0.05], # lift
         [-10*np.pi/180, 10 * np.pi/180] # roll
     ]
+
+def convert_to_action(model, inp):
+    # action_space = [del_extension, del_height, del_lateral, del_roll, del_gripper]
     print("before model inp. inp shape", inp.size())
     outputs = model(inp) # 11x1
     print("output shape", outputs[0].size())
+    action_idx = torch.argmax(outputs[0])
+    lookup_copy = copy.deepcopy(lookup)
+    outputs = lookup_copy[int(action_idx)]
+    print("before norm argmax:", int(action_idx), "output:",outputs)
+    # print("lookup, lookup[id]",lookup,lookup[int(action_idx)])
+    for i in range(len(limits)):
+        outputs[i] = outputs[i] * (limits[i][1] - limits[i][0]) + limits[i][0]
+    return outputs
+
+def convert_to_action_w_audio(model, inp, audio_inp):
+    '''
+    audio_inp: numpy array of audio data
+    '''
+    # Convert audio to wav
+    # run_id = datetime.datetime.now().strftime('%s%f')
+    # pathFolder = 'data/' + run_id + '/'
+    # os.makedirs(pathFolder, exist_ok= True)
+    # os.makedirs(pathFolder + 'video/', exist_ok= True)
+    # # filename = datetime.datetime.now().strftime('%s%f')
+    # filename = "audio_3s"
+    # path = pathFolder + f"{filename}.wav"
+    # w = wave.open(path, 'w')
+    # w.setnchannels(1)
+    # w.setsampwidth(2)
+    # w.setframerate(48000)
+    # w.writeframes(audio_inp)
+    # w.close()
+
+    audio_gripper = [
+        x for x in audio_inp if x is not None
+    ]
+    # print("ag", torch.tensor(audio_gripper).shape) #(434176, 2)
+    audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
+    # print("ag1", audio_gripper.shape) #(434176, 2)
+    # audio_gripper = (audio_gripper.T[0,:]).reshape(1,-1)
+    audio_gripper = (audio_gripper).reshape(1,-1)
+
+    print("before model inp")
+    outputs = model((inp, audio_gripper)) # 11x1
+    print("output shape", outputs[0].size())
+
+
+
     action_idx = torch.argmax(outputs[0])
     lookup_copy = copy.deepcopy(lookup)
     outputs = lookup_copy[int(action_idx)]
@@ -95,8 +140,31 @@ def get_image_history(cap, history, history_len):
     
     return history.float()
         
+def audio_start():
+    print("Starting audio loop")
+    global inp
+    inp = alsaaudio.PCM(1)
+    inp.setchannels(1)
+    inp.setrate(48000)
+    inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+    inp.setperiodsize(1024)
+
+
+def get_audio_history(audio_history, audio_history_len):
+    global inp
+    while True:
+        l, data = inp.read()
+        a = np.frombuffer(data, dtype=np.int16)
+        audio_history.append(a)
+        if len(audio_history) >= audio_history_len * 48000:
+            audio_history = audio_history[-audio_history_len * 48000:]
+            break
+    audio_history = np.array(audio_history)
+    return audio_history
+
 
 def run_loop(model):
+    audio_start()
     is_run = True
     start_time = time.time()
     
@@ -105,19 +173,22 @@ def run_loop(model):
     loop_rate = 1
     loop_start_time = time.time()
     history = torch.zeros(size=(1,1,3,720,1280))
+    audio_history = []
     print("start loop")
     while is_run:
         # if time.time() - start_time > 10:
         #     is_run = False
 
         history = get_image_history(cap, history, HISTORY_LEN)
+        audio_history = get_audio_history(audio_history, AUDIO_HISTORY_LEN)
+
 
         if time.time() - loop_start_time > 1/loop_rate:
             loop_start_time = time.time()
             # history = get_image(cap)
             # history = get_image_history(cap, history, HISTORY_LEN)
             if history is not None:
-                action = convert_to_action(model, history)
+                action = convert_to_action_w_audio(model, history, audio_history)
                 execute_action(r, action)
                 print("action:  ",action)
             else:
