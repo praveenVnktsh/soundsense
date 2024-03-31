@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 class CNNLSTMWithResNetForActionPrediction(pl.LightningModule):
     def __init__(self, sequence_length, lstm_hidden_dim, output_dim, lstm_layers, dropout):
         super(CNNLSTMWithResNetForActionPrediction, self).__init__()
-        
+        self.save_hyperparameters()
         # Load pretrained ResNet model
         resnet = models.resnet18(pretrained=True)
         self.resnet = nn.Sequential(*list(resnet.children())[:-1])  # Remove the last fully connected layer
