@@ -1,66 +1,80 @@
 import os
 import torch
+import yaml
+import pandas as pd
 import torchvision.transforms as T
 
 from src.datasets.base import EpisodeDataset
 import numpy as np
 from PIL import Image
 import random
+from torch.utils.data.dataset import Dataset
+import torchaudio
+import soundfile as sf
+import json
+import glob
 
-class ImitationEpisode(EpisodeDataset):
-    def __init__(self, args, dataset_idx, data_folder, train=True):
+class ImitationEpisode(Dataset):
+    def __init__(self, 
+            config_path,
+            run_id, 
+            train=True):
         # print("d_idx", dataset_idx)
-        super().__init__( data_folder)
+        super().__init__()
         self.train = train
-        self.num_stack = args.num_stack
-        self.frameskip = args.frameskip
+        
+        super().__init__()
+        # self.logs = pd.read_csv(log_file)
+        self.run_id = run_id
+        self.sample_rate_audio = 48000 ##TODO
+        self.mel = torchaudio.transforms.MelSpectrogram(
+            sample_rate=self.sample_rate_audio,
+            n_fft=int(self.sample_rate_audio * 0.025),
+            hop_length=int(self.sample_rate_audio * 0.01),
+            n_mels=64,
+            center=False,
+        )
+        
+        # Load config
+        with open(config_path) as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
+
+        self.fps = config["fps"]
+        self.audio_len = config['audio_len']
+        self.sample_rate_audio = config["sample_rate_audio"]
+        self.resample_rate_audio = config['resample_rate_audio']
+        self.modalities = config['modalities'].split("_")
+        self.resized_height_v = config['resized_height_v']
+        self.resized_width_v = config['resized_width_v']
+        self.nocrop = not config['is_crop']
+        self.crop_percent = config['crop_percent']
+
+        self.dataset_root = config['dataset_root']
+        
+        # Number of images to stack
+        self.num_stack = config['num_stack']
+        # Number of frames to skip
+        self.frameskip = self.fps * self.audio_len // self.num_stack
+        # Maximum length of images to consider for stacking
         self.max_len = (self.num_stack - 1) * self.frameskip
-        self.fps = 10
-        self.sr = 48000 ##44100 TODO
-        self.resolution = (
-            self.sr // self.fps
-        )  # number of audio samples in one image idx
-        # self.audio_len = int(self.resolution * (max(self.max_len + 1, 10)))
-        self.audio_len = self.num_stack * self.frameskip * self.resolution
-
+        # Number of audio samples for one image idx
+        self.resolution = self.sample_rate_audio // self.fps  
+        
         # augmentation parameters
-        self.EPS = 1e-8
-        self.resized_height_v = args.resized_height_v
-        self.resized_width_v = args.resized_width_v
-        self.resized_height_t = args.resized_height_t
-        self.resized_width_t = args.resized_width_t
-        self._crop_height_v = int(self.resized_height_v * (1.0 - args.crop_percent))
-        self._crop_width_v = int(self.resized_width_v * (1.0 - args.crop_percent))
-        self._crop_height_t = int(self.resized_height_t * (1.0 - args.crop_percent))
-        self._crop_width_t = int(self.resized_width_t * (1.0 - args.crop_percent))
-        (
-            self.trial,
-            self.timestamps,
-            self.audio_gripper,
-            self.num_frames,
-        ) = self.get_episode(dataset_idx, args, train, ablation=args.ablation)
+        self._crop_height_v = int(self.resized_height_v * (1.0 - self.crop_percent))
+        self._crop_width_v = int(self.resized_width_v * (1.0 - self.crop_percent))
 
-        # # saving the offset for gelsight in order to normalize data
-        # self.gelsight_offset = (
-        #     torch.as_tensor(
-        #         np.array(Image.open(os.path.join(self.data_folder, "gs_offset.png")))
-        #     )
-        #     .float()
-        #     .permute(2, 0, 1)
-        #     / 255
-        # )
-        self.action_dim = args.action_dim
-        self.task = args.task
-        self.modalities = args.ablation.split("_")
-        self.nocrop = args.nocrop
+        self.actions, self.audio_gripper, self.episode_length, self.image_paths = self.get_episode()
 
+        # self.action_dim = config['action_dim']
+        
         if self.train:
-            self.transform_cam = [
-                T.Resize((self.resized_height_v, self.resized_width_v)),
-                T.ColorJitter(brightness=0.2, contrast=0.02, saturation=0.02),
-            ]
-            self.transform_cam = T.Compose(self.transform_cam)
-
+            self.transform_cam = T.Compose(
+                [
+                    T.Resize((self.resized_height_v, self.resized_width_v)),
+                    T.ColorJitter(brightness=0.2, contrast=0.02, saturation=0.02),
+                ]
+            )
         else:
             self.transform_cam = T.Compose(
                 [
@@ -69,63 +83,94 @@ class ImitationEpisode(EpisodeDataset):
                 ]
             )
 
-    def __len__(self):
-        return self.num_frames
+    def load_image(self, idx):
+        img_path = self.image_paths[idx]
+        image = (
+            torch.as_tensor(np.array(Image.open(img_path))).float().permute(2, 0, 1)
+            / 255
+        )
+        
+        return image
+    
+    def clip_resample(self, audio, audio_start, audio_end):
+        left_pad, right_pad = torch.Tensor([]), torch.Tensor([])
+        # print("au_size", audio.size())
+        if audio_start < 0:
+            left_pad = torch.zeros((audio.shape[0], -audio_start))
+            audio_start = 0
+        if audio_end >= audio.size(-1):
+            right_pad = torch.zeros((audio.shape[0], audio_end - audio.size(-1)))
+            audio_end = audio.size(-1)
+        audio_clip = torch.cat(
+            [left_pad, audio[:, audio_start:audio_end], right_pad], dim=1
+        )
+        # print(f"start {audio_start}, end {audio_end} left {left_pad.size()}, right {right_pad.size()}. audio_clip {audio_clip.size()}")
+        audio_clip = torchaudio.functional.resample(audio_clip, self.sample_rate_audio, self.resample_rate_audio)
+        # print("Inside clip_resample output shape", audio_clip.shape)
+        
+        return audio_clip
 
-    def get_demo(self, idx):
-        # TODO: Discretize action space if not already
-        # print(len(self.timestamps["action_history"]))
-        # keyboard = self.timestamps["action_history"][idx]
-        # # print(keyboard)
-        # if self.task == "pouring":
-        #     x_space = {-0.0005: 0, 0: 1, 0.0005: 2}
-        #     dy_space = {-0.0012: 0, 0: 1, 0.004: 2}
-        #     keyboard = x_space[keyboard[0]] * 3 + dy_space[keyboard[4]]
-        # else:
-        #     x_space = {-0.0005: 0, 0: 1, 0.0005: 2}
-        #     y_space = {-0.0005: 0, 0: 1, 0.0005: 2}
-        #     z_space = {-0.0005: 0, 0: 1, 0.0005: 2}
-        #     keyboard = (
-        #         x_space[keyboard[0]] * 9
-        #         + y_space[keyboard[1]] * 3
-        #         + z_space[keyboard[2]]
-        #     )
-        action_timet = self.timestamps[idx]
-        return action_timet 
+    def __len__(self):
+        return len(self.logs)
+
+    def get_episode(self):            
+        episode_folder = os.path.join(self.dataset_root, self.run_id)
+
+        with open(os.path.join(episode_folder, "action.json")) as ts:
+            actions = json.load(ts)
+
+        if "ag" in self.modalities:
+            if os.path.exists(os.path.join(episode_folder, "processed_audio.wav")):
+                audio_gripper1 = sf.read(os.path.join(episode_folder, "processed_audio.wav"))[0]
+            else:
+                audio_gripper1 = None
+            
+            audio_gripper = [
+                x for x in audio_gripper1 if x is not None
+            ]
+            audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
+            audio_gripper = (audio_gripper).reshape(1,-1)
+        else:
+            audio_gripper = None
+
+        image_paths = sorted(glob.glob(f'{self.dataset_root}/{self.run_id}/video/*.png'))
+
+        return (
+            actions,
+            audio_gripper,
+            min(len(actions), len(os.listdir(os.path.join(episode_folder, "video")))),
+            image_paths
+        )
+
+    def __len__(self):
+        return self.episode_length
 
     def __getitem__(self, idx):
-        # print("idx_in_getitem", idx, self.max_len)
-        start = idx - self.max_len
-        # print("start", start)
-        # compute which frames to use TODO
-        frame_idx = np.arange(start, idx + 1, self.frameskip)
-        # print("frame_idx_len", len(frame_idx))
-        frame_idx[frame_idx < 0] = -1
+        start_idx = idx - self.max_len
 
-        # print("len_timestamps", self.num_frames)
-        frame_idx[frame_idx >= self.num_frames] = self.num_frames - 1
-
-        # images
-        # to speed up data loading, do not load img if not using
-        cam_gripper_framestack = 0
-        # print(frame_idx)
-        # process different streams of data
+        # Frames to stack
+        frame_idx = np.arange(start_idx, idx + 1, self.frameskip)
+        frame_idx[frame_idx < 0] = 0
+        frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1
+    
         if "vg" in self.modalities:
+            # stacks from oldest to newest left to right!!!!
             cam_gripper_framestack = torch.stack(
                 [
                     self.transform_cam(
-                        self.load_image(self.trial, "video", timestep)
+                        self.load_image(idx)
                     )
-                    for timestep in frame_idx
+                    for idx in frame_idx
                 ],
                 dim=0,
             )
+        else:
+            cam_gripper_framestack = None
 
-        # random cropping
+        # Random cropping
         if self.train:
-            # print("idx_in_getitem_train", idx)
             img = self.transform_cam(
-                self.load_image(self.trial, "video", idx)
+                self.load_image(idx)
             )
             if not self.nocrop:
                 i_v, j_v, h_v, w_v = T.RandomCrop.get_params(
@@ -144,51 +189,20 @@ class ImitationEpisode(EpisodeDataset):
                     ..., i_v : i_v + h_v, j_v : j_v + w_v
                 ]
 
-        # load audio
-        # print("idx_in_getitem_after_train", idx)
         audio_end = idx * self.resolution
-        audio_start = audio_end - self.audio_len  # why self.sr // 2, and start + sr
-        # audio_start = int((idx/10-3)*self.sr)      # TODO: why divide by 10
-        # audio_end = int((idx/10)*self.sr)
-        # print(self.audio_len, audio_end, audio_start, self.resolution)
+        audio_start = audio_end - self.audio_len * self.sample_rate_audio
+        
         if self.audio_gripper is not None:
             audio_clip_g = self.clip_resample(
                 self.audio_gripper, audio_start, audio_end
             ).float()
-            # print("ag", audio_clip_g.shape)
-            # assert audio_clip_g.shape == torch.Size([1, int(self.audio_len/3)])
         else:
             audio_clip_g = 0
  
-        # load labels ## TODO
-        # keyboard = random.randint(0, 2)  # self.get_demo(idx)
-        # xyzpry = torch.Tensor(self.timestamps["pose_history"][idx][:6])
-        # print("time", len(self.timestamps))
-        xyzgt =  torch.Tensor(self.timestamps[idx])
-        # print("xyz", xyzgt.shape)  
+        xyzgt = torch.Tensor(self.actions[idx])
 
         return (
             (cam_gripper_framestack,
             audio_clip_g,),
-            # keyboard,
             xyzgt,
         )
-
-
-# class TransformerEpisode(ImitationEpisode):
-#     @staticmethod
-#     def load_image(trial, stream, timestep):
-#         """
-#         Do not duplicate first frame for padding, instead return all zeros
-#         """
-#         return_null = timestep == -1
-#         if timestep == -1:
-#             timestep = 0
-#         img_path = os.path.join(trial, stream, str(timestep) + ".png")
-#         image = (
-#             torch.as_tensor(np.array(Image.open(img_path))).float().permute(2, 0, 1)
-#             / 255
-#         )
-#         if return_null:
-#             image = torch.zeros_like(image)
-#         return image
