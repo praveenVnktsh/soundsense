@@ -12,3 +12,4 @@ baselines/cnn/lightning_logs/
 baselines/mulsa/exp*
 baselines/playbyear/Results/
 baselines/playbyear/hydralogs/
+*.jpg

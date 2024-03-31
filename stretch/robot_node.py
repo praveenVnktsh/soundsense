@@ -95,11 +95,12 @@ class RobotNode:
                     if len(self.history['video']) > n_stack:
                         self.history['video'] = self.history['video'][-n_stack:]
 
-                    stacked_inp = np.hstack(self.history['video'])
 
-                    if visualize:
-                        cv2.imshow('stacked', stacked_inp)
-                        cv2.waitKey(1)
+                    # if visualize:
+                        # stacked_inp = np.hstack(self.history['video'])
+                        # cv2.imwrite('stacked_inp.jpg', stacked_inp)
+                        # cv2.imshow('stacked', stacked_inp)
+                        # cv2.waitKey(1)
                     
                     self.execute_action()
                 else:
@@ -108,7 +109,7 @@ class RobotNode:
 
         print("Ending run loop")
 
-    def generate_inputs(self):
+    def generate_inputs(self, save = True):
         
         video = self.history['video'] # subsample n_frames of interest
         n_images = len(video)
@@ -117,6 +118,10 @@ class RobotNode:
 
         video = video[::choose_every]
         audio = self.history['audio']
+
+        if save:
+            stacked = np.hstack(video)
+            cv2.imwrite('stacked.jpg', stacked)
 
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]
