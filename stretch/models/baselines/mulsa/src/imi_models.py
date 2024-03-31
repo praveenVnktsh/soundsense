@@ -60,6 +60,7 @@ class Actor(torch.nn.Module):
         """
 
         vg_inp, audio_g, = inputs
+        # vg_inp = inputs
         embeds = []
 
         if "vg" in self.modalities:

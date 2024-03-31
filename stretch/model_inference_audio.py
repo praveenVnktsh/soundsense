@@ -17,7 +17,7 @@ import pyaudio, alsaaudio
 sys.path.append("")
 
 HISTORY_LEN = 6
-AUDIO_HISTORY_LEN = 3 # seconds
+AUDIO_HISTORY_LEN = 0.01 # seconds
 
 # Model:
 # extension+, extension-, base-, base+, gripper+, gripper-, lift+, lift-, roll-, roll+, no_action
@@ -89,7 +89,7 @@ def convert_to_action_w_audio(model, inp, audio_inp):
     # w.setframerate(48000)
     # w.writeframes(audio_inp)
     # w.close()
-
+    # audio_inp = np.expand_dims(audio_inp,0)
     audio_gripper = [
         x for x in audio_inp if x is not None
     ]
@@ -98,6 +98,7 @@ def convert_to_action_w_audio(model, inp, audio_inp):
     # print("ag1", audio_gripper.shape) #(434176, 2)
     # audio_gripper = (audio_gripper.T[0,:]).reshape(1,-1)
     audio_gripper = (audio_gripper).reshape(1,-1)
+    audio_gripper = audio_gripper.unsqueeze(0)
 
     print("before model inp")
     outputs = model((inp, audio_gripper)) # 11x1
@@ -140,31 +141,33 @@ def get_image_history(cap, history, history_len):
     
     return history.float()
         
-def audio_start():
-    print("Starting audio loop")
-    global inp
-    inp = alsaaudio.PCM(1)
-    inp.setchannels(1)
-    inp.setrate(48000)
-    inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
-    inp.setperiodsize(1024)
+# def audio_start():
+#     print("Starting audio loop")
+#     global inp
+inp = alsaaudio.PCM(1)
+inp.setchannels(1)
+inp.setrate(48000)
+inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+inp.setperiodsize(1024)
 
 
 def get_audio_history(audio_history, audio_history_len):
-    global inp
+    # global inp
+    print("start get_audio_history")
     while True:
+        print("looping", len(audio_history))
         l, data = inp.read()
         a = np.frombuffer(data, dtype=np.int16)
-        audio_history.append(a)
+        audio_history = np.append(audio_history, a)
         if len(audio_history) >= audio_history_len * 48000:
-            audio_history = audio_history[-audio_history_len * 48000:]
+            audio_history = audio_history[-int(audio_history_len * 48000):]
             break
     audio_history = np.array(audio_history)
     return audio_history
 
 
 def run_loop(model):
-    audio_start()
+    # audio_start()
     is_run = True
     start_time = time.time()
     
@@ -173,15 +176,17 @@ def run_loop(model):
     loop_rate = 1
     loop_start_time = time.time()
     history = torch.zeros(size=(1,1,3,720,1280))
-    audio_history = []
+    audio_history = np.array([])
     print("start loop")
     while is_run:
         # if time.time() - start_time > 10:
         #     is_run = False
-
+        print("getting images...",end=" ")
         history = get_image_history(cap, history, HISTORY_LEN)
+        print("done")
+        print("getting audio...",end=" ")
         audio_history = get_audio_history(audio_history, AUDIO_HISTORY_LEN)
-
+        print("done")
 
         if time.time() - loop_start_time > 1/loop_rate:
             loop_start_time = time.time()
@@ -233,8 +238,9 @@ if __name__ == "__main__":
     r.arm.wait_until_at_setpoint()
     
 
+    model = MULSAInference.load_from_checkpoint("/home/hello-robot/soundsense/soundsense/stretch/models/baselines/mulsa/03272024_205921_last.ckpt")
     
-    model = MULSAInference.load_from_checkpoint("/home/hello-robot/soundsense/soundsense/stretch/models/baselines/mulsa/exp03282024_16484_last.ckpt")
+    # model = MULSAInference.load_from_checkpoint("/home/hello-robot/soundsense/soundsense/stretch/models/baselines/mulsa/exp03282024_16484_last.ckpt")
     # model = CNNLSTMWithResNetForActionPrediction.load_from_checkpoint("/home/hello-robot/soundsense/soundsense/stretch/models/baselines/cnnlstm/epoch=28-step=8352.ckpt")
     run_loop(model)
     r.stop()
