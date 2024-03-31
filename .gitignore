@@ -13,3 +13,6 @@ baselines/mulsa/exp*
 baselines/playbyear/Results/
 baselines/playbyear/hydralogs/
 *.jpg
+*.pt
+*.csv
+*.log

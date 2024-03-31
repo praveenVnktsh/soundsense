@@ -1,1 +1,0 @@
-/home/punygod_admin/SoundSense/soundsense/baselines/mulsa/exp03172024pouring/imi_learn/checkpoints/default/03-17-02:38:38-jobid=0-epoch=3-step=1732.ckpt
