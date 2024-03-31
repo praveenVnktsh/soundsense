@@ -96,4 +96,4 @@ class MULSAInference(pl.LightningModule):
         x = video, audio
         out = self.actor(x)
         # print(out.shape)
-        return out[0]
+        return out

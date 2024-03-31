@@ -8,25 +8,25 @@ from datetime import datetime
 import numpy as np
 
 
-def save_config(args):
-    config_name = os.path.basename(args.config).split(".yaml")[0]
-    now = datetime.now()
-    dt = now.strftime("%m%d%Y_%H%M%S")
-    exp_dir = os.path.join("exp" + dt + args.task, config_name)
-    if not os.path.exists(exp_dir):
-        os.makedirs(exp_dir)
-    with open(os.path.join(exp_dir, "conf.yaml"), "w") as outfile:
-        yaml.safe_dump(vars(args), outfile)
-    return exp_dir
+# def save_config(args):
+#     config_name = os.path.basename(args.config).split(".yaml")[0]
+#     now = datetime.now()
+#     dt = now.strftime("%m%d%Y_%H%M%S")
+#     exp_dir = os.path.join("exp" + dt + args.task, config_name)
+#     if not os.path.exists(exp_dir):
+#         os.makedirs(exp_dir)
+#     with open(os.path.join(exp_dir, "conf.yaml"), "w") as outfile:
+#         yaml.safe_dump(vars(args), outfile)
+#     return exp_dir
 
 
-def start_training(args, exp_dir, pl_module, monitor="val/loss"):
+def start_training(config, exp_dir, pl_module, monitor="val/loss"):
     jobid = np.random.randint(0, 1000)
     jobid = os.environ.get("SLURM_JOB_ID", 0)
-    exp_time = datetime.now().strftime("%m-%d-%H:%M:%S") + "-jobid=" + str(jobid)
+    exp_time = datetime.now().strftime("%m-%d-%H:%M:%S") 
     checkpoint = ModelCheckpoint(
-        dirpath=os.path.join(exp_dir, "checkpoints", args.exp_name),
-        filename=exp_time + "-{epoch}-{step}",
+        dirpath=os.path.join(exp_dir, "checkpoints", config['exp_name']),
+        filename=exp_time ,
         save_top_k=4,
         save_last=True,
         monitor=monitor,
@@ -34,10 +34,10 @@ def start_training(args, exp_dir, pl_module, monitor="val/loss"):
     )
 
     logger = TensorBoardLogger(
-        save_dir=exp_dir, version=exp_time + args.exp_name, name="lightning_logs"
+        save_dir=exp_dir, version=exp_time + config['exp_name'], name="lightning_logs"
     )
     trainer = Trainer(
-        max_epochs=args.epochs,
+        max_epochs=config['epochs'],
         callbacks=[checkpoint],
         default_root_dir=exp_dir,
         # gpus=-1,
@@ -50,7 +50,7 @@ def start_training(args, exp_dir, pl_module, monitor="val/loss"):
     trainer.fit(
         pl_module,
         ckpt_path=None
-        if args.resume is None
-        else os.path.join(os.getcwd(), args.resume),
+        if config['resume'] is False
+        else os.path.join(os.getcwd(), config['resume']),
     )
     print("best_model", checkpoint.best_model_path)

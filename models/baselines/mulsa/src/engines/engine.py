@@ -6,7 +6,7 @@ from torch.autograd import Variable
 import numpy as np
 import torchvision
 import matplotlib.pyplot as plt
-import pandas as pd
+
 
 
 class ImiEngine(LightningModule):
@@ -28,20 +28,14 @@ class ImiEngine(LightningModule):
         self.save_hyperparameters(config)
         print("baseline learn")
 
-    # def compute_loss(self, demo, pred_logits, xyz_gt, xyz_pred):
-    #     immi_loss = self.loss_cce(pred_logits, demo)
-    #     aux_loss = F.mse_loss(xyz_gt, xyz_pred)
-    #     return immi_loss + aux_loss * self.config.aux_multiplier, immi_loss, aux_loss
     def compute_loss(self, xyz_gt, xyz_pred):
-        # print(xyz_gt.shape, xyz_pred.shape)
-        # loss = F.mse_loss(xyz_gt, xyz_pred)
         loss = self.loss_cce(xyz_pred, xyz_gt)
         return loss
 
     def training_step(self, batch, batch_idx):
         # use idx in batch for debugging
         inputs, xyzgt_gt = batch
-        print("training_step input shape", inputs[0].size())
+        # print("training_step input shape", inputs[0].size())
         xyzgt_pred, weights = self.actor(inputs)  # , idx)
         loss = self.compute_loss(xyzgt_gt, xyzgt_pred)
         self.log_dict(

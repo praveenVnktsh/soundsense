@@ -1,10 +1,8 @@
 import os
 import torch
 import yaml
-import pandas as pd
 import torchvision.transforms as T
 
-from src.datasets.base import EpisodeDataset
 import numpy as np
 from PIL import Image
 import random
@@ -13,10 +11,11 @@ import torchaudio
 import soundfile as sf
 import json
 import glob
+import matplotlib.pyplot as plt
 
 class ImitationEpisode(Dataset):
     def __init__(self, 
-            config_path,
+            config,
             run_id, 
             train=True):
         # print("d_idx", dataset_idx)
@@ -35,10 +34,6 @@ class ImitationEpisode(Dataset):
             center=False,
         )
         
-        # Load config
-        with open(config_path) as f:
-            config = yaml.load(f, Loader=yaml.FullLoader)
-
         self.fps = config["fps"]
         self.audio_len = config['audio_len']
         self.sample_rate_audio = config["sample_rate_audio"]
@@ -72,14 +67,16 @@ class ImitationEpisode(Dataset):
             self.transform_cam = T.Compose(
                 [
                     T.Resize((self.resized_height_v, self.resized_width_v)),
-                    T.ColorJitter(brightness=0.2, contrast=0.02, saturation=0.02),
+                    T.ColorJitter(brightness=0.1, contrast=0.02, saturation=0.02),
+                    T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                 ]
             )
         else:
             self.transform_cam = T.Compose(
                 [
                     T.Resize((self.resized_height_v, self.resized_width_v)),
-                    T.CenterCrop((self._crop_height_v, self._crop_width_v)),
+                    # T.CenterCrop((self._crop_height_v, self._crop_width_v)),
+                    T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                 ]
             )
 
@@ -89,7 +86,11 @@ class ImitationEpisode(Dataset):
             torch.as_tensor(np.array(Image.open(img_path))).float().permute(2, 0, 1)
             / 255
         )
+        # normalization
+        # image -= 0.5
+        # image /= 0.5
         
+
         return image
     
     def clip_resample(self, audio, audio_start, audio_end):
@@ -111,12 +112,12 @@ class ImitationEpisode(Dataset):
         return audio_clip
 
     def __len__(self):
-        return len(self.logs)
+        return self.episode_length
 
     def get_episode(self):            
         episode_folder = os.path.join(self.dataset_root, self.run_id)
 
-        with open(os.path.join(episode_folder, "action.json")) as ts:
+        with open(os.path.join(episode_folder, "actions.json")) as ts:
             actions = json.load(ts)
 
         if "ag" in self.modalities:
@@ -138,7 +139,7 @@ class ImitationEpisode(Dataset):
         return (
             actions,
             audio_gripper,
-            min(len(actions), len(os.listdir(os.path.join(episode_folder, "video")))),
+            min(len(actions), len(image_paths)),
             image_paths
         )
 
@@ -164,6 +165,13 @@ class ImitationEpisode(Dataset):
                 ],
                 dim=0,
             )
+            if idx > 500:
+                stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
+                stacked = np.hstack(stacked)
+                plt.imsave('image.png',stacked) 
+                for idx in frame_idx:
+                    print(self.actions[idx])
+                exit()
         else:
             cam_gripper_framestack = None
 
