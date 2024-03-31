@@ -18,16 +18,12 @@ def run_loop(model):
     is_run = True
     start_time = time.time()
     
-    cap = cv2.VideoCapture(6)
-    # cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    
+    cap = cv2.VideoCapture('/dev/video6')
     loop_rate = 10
     loop_start_time = time.time()
     history = []
     n_stack = 10
     while is_run:
-        # if time.time() - start_time > 10:
-        #     is_run = False
         frame = get_image(cap)
 
         if len(history) > 0:
@@ -35,9 +31,7 @@ def run_loop(model):
         if time.time() - loop_start_time > 1/loop_rate:
             loop_start_time = time.time()
             
-            # cv2.imshow('frame', frame)
-            
-            
+            cv2.imshow('frame', frame)
             history.append(frame)
             if frame is not None:
                 if len(history) < n_stack:
@@ -86,18 +80,22 @@ def execute_action(r: stretch_body.robot.Robot, model, inp):
         'k': 7,
         'j': 8,
         'l': 9,
+        'none': 10,
     }
+    inv_mapping = {v: k for k, v in mapping.items()}
+    
+    
 
     action_idx = torch.argmax(outputs).item()
-    print("Performing action: ", action_idx, outputs)
-    big = 0.05
+    print("action: ", inv_mapping[action_idx], "output: ", outputs)
+    big = 0.01
     movement_resolution = {
         0: big,
         1: -big,
         2: big,
         3: -big,
-        4: 100,
-        5: 30,
+        4: 50,
+        5: -50,
         6: big,
         7: -big,
         8: 15 * np.pi/180,
@@ -109,9 +107,9 @@ def execute_action(r: stretch_body.robot.Robot, model, inp):
         r.base.translate_by(movement_resolution[action_idx])
     elif action_idx in [4, 5]:
         r.end_of_arm.move_by('stretch_gripper', movement_resolution[action_idx])
-    elif action_idx in [6, 7]:
-        r.end_of_arm.move_by('wrist_roll', movement_resolution[action_idx])
     elif action_idx in [8, 9]:
+        r.end_of_arm.move_by('wrist_roll', movement_resolution[action_idx])
+    elif action_idx in [6, 7]:
         r.lift.move_by(movement_resolution[action_idx])
     r.push_command()
     # time.sleep(1)
@@ -121,7 +119,8 @@ def execute_action(r: stretch_body.robot.Robot, model, inp):
 if __name__ == "__main__":
     import time
     r = stretch_body.robot.Robot()
-    model = LitModel.load_from_checkpoint("/home/hello-robot/soundsense/soundsense/stretch/models/baselines/cnn/e246_10.ckpt", audio =False, n_stacked = 10)
+    action_path = '/home/hello-robot/soundsense/soundsense/stretch/data_two_cups/3/actions.json'
+    model = LitModel(action_path = action_path)
     model.eval()
     
     if not r.startup():
@@ -135,12 +134,12 @@ if __name__ == "__main__":
             print("Exiting...")
             exit()
 
-    r.lift.move_to(0.7)
+    r.lift.move_to(1.0)
     r.arm.move_to(0.1)
     r.end_of_arm.move_to('wrist_yaw', 0.0)
     r.end_of_arm.move_to('wrist_pitch', 0.0)
     r.end_of_arm.move_to('wrist_roll', 0.0)
-    r.end_of_arm.move_to('stretch_gripper', 0)
+    r.end_of_arm.move_to('stretch_gripper', 100)
     r.push_command()
     r.lift.wait_until_at_setpoint()
     r.arm.wait_until_at_setpoint()

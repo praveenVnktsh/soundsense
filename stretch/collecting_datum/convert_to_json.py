@@ -16,8 +16,9 @@ mapping = {
     'l': 9,
 }
 # for folder
-for run_id in os.listdir('hundred/data'):
-    root = f'hundred/data/{run_id}'
+og_root = '/home/hello-robot/soundsense/soundsense/stretch/data_two_cups'
+for run_id in os.listdir(og_root):
+    root = f'{og_root}/{run_id}'
     print("Processing ", root)
     with open(f'{root}/keyboard_teleop.txt', 'r') as f:
         data = f.readlines()

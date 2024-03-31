@@ -8,37 +8,24 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as L
 import numpy as np
 import cv2
+import json
 
 class LitModel(L.LightningModule):
-    def __init__(self, audio = True, n_stacked = 3):
+    def __init__(self, action_path):
         super().__init__()
-        self.encoder = Encoder(audio = audio, n_stacked = n_stacked)
-
-
-        # with open('data.txt', 'r') as f:
-            # self.data = 
-
-
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[123.675, 116.28, 103.53],
-                                 std=[66.675, 63.84, 57.375]),
-        ])
-
+        
+        with open(action_path, 'rb') as f:
+            self.actions = json.load(f)
+        self.counter = 0
     def forward(self, hist):
-        inp = []
-        for im in hist:
-            im = im.astype(np.float32)
-            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-            o = self.transform(im).float()
-            inp.append(o)
-
-        inp = torch.stack(inp).unsqueeze(0)
-        z = self.encoder({
-            'audio': None,
-            'video': inp
-        })
-        return z
+        act = torch.tensor(self.actions[self.counter])
+        
+        self.counter += 1
+        if self.counter >= len(self.actions):
+            act = torch.zeros((11))
+            act[-1] = 1
+        return act
+        
 
 class Encoder(nn.Module):
     def __init__(self, audio = True, n_stacked = 3):
