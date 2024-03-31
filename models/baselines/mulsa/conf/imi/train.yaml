@@ -18,7 +18,7 @@ crop_percent: 0.1
 # dataset
 dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data'
 train_val_split: 0.8
-num_workers: 0
+num_workers: 16
 batch_size: 32
 
 # model params
