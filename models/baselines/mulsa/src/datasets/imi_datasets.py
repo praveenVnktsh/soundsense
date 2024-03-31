@@ -165,13 +165,13 @@ class ImitationEpisode(Dataset):
                 ],
                 dim=0,
             )
-            if idx > 500:
-                stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
-                stacked = np.hstack(stacked)
-                plt.imsave('image.png',stacked) 
-                for idx in frame_idx:
-                    print(self.actions[idx])
-                exit()
+            # if idx > 500:
+            #     stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
+            #     stacked = np.hstack(stacked)
+            #     plt.imsave('image.png',stacked) 
+            #     for idx in frame_idx:
+            #         print(self.actions[idx])
+            #     exit()
         else:
             cam_gripper_framestack = None
 

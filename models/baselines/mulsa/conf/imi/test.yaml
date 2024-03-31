@@ -39,7 +39,7 @@ period: 3
 epochs: 100
 resume: False
 log_dir: '/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/'
-exp_name: 'mulsa_unimodal_simple_task_1'
+exp_name: 'mar31-1641'
 
 
 
