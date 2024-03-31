@@ -8,13 +8,15 @@ import rospy
 from audio_common_msgs.msg import AudioDataStamped, AudioData
 
 class RobotNode:
-    def __init__(self, model, is_unimodal = False):
+    def __init__(self, config_path, model, is_unimodal = False):
         self.r = stretch_body.robot.Robot()
         self.boot_robot()
         
-        with open('test.yaml') as info:
-            params = yaml.load(info)
+        with open(config_path) as info:
+            params = yaml.load(info.read(), Loader=yaml.FullLoader)
 
+        self.image_shape = params['camera_inp_h_w']
+        self.bgr_to_rgb = params['bgr_to_rgb']
 
         self.hz = params['audio_hz']
         self.audio_n_seconds = params['audio_history_seconds']
@@ -24,9 +26,10 @@ class RobotNode:
             'audio': [],
             'video': [],
         }
-
         if not is_unimodal:
             audio_sub = rospy.Subscriber('/audio/audio', AudioData, self.callback)
+            print("Waiting for audio data...")
+            rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
         self.cap  = cv2.VideoCapture(cam)
         self.model = model
     
@@ -50,7 +53,7 @@ class RobotNode:
                 exit()
 
         r.lift.move_to(0.9)
-        r.arm.move_to(0.1)
+        r.arm.move_to(0.3)
         r.end_of_arm.move_to('wrist_yaw', 0.0)
         r.end_of_arm.move_to('wrist_pitch', 0.0)
         r.end_of_arm.move_to('wrist_roll', 0.0)
@@ -61,10 +64,12 @@ class RobotNode:
         time.sleep(5)
         print("Robot ready to run model.")
     
-    def get_image(self, cap):
-        h, w = 224, 224
-        ret, frame = cap.read()
+    def get_image(self):
+        h, w = self.image_shape 
+        ret, frame = self.cap.read()
         frame = cv2.resize(frame, (h, w))
+        if self.bgr_to_rgb:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         if not ret:
             return None
         return frame
@@ -79,7 +84,7 @@ class RobotNode:
         while is_run:
             frame = self.get_image()
             if len(self.history['video']) > 0:
-                self.history['video'] = frame.copy()
+                self.history['video'][-1] = frame.copy()
             if time.time() - loop_start_time > 1/loop_rate:
                 loop_start_time = time.time()
                 
@@ -102,32 +107,35 @@ class RobotNode:
                     is_run = False
 
         print("Ending run loop")
-        
 
     def generate_inputs(self):
-        history = {
-            'audio': np.array(self.history['audio']),
-            'video': np.array(self.history['video']),
-        }
-        video = history['video'] # subsample n_frames of interest
+        
+        video = self.history['video'] # subsample n_frames of interest
         n_images = len(video)
 
         choose_every = n_images // self.n_stack_images
 
         video = video[::choose_every]
-        audio = history['audio']
+        audio = self.history['audio']
 
-
+        # cam_gripper_framestack,audio_clip_g
+        # vg_inp: [batch, num_stack, 3, H, W]
+        # a_inp: [batch, 1, T]
         
+        video = video[-self.n_stack_images:]
+        video = [(img).astype(float)/ 255 for img in video]
+        
+        return {
+            'video' : video, # list of images
+            'audio' : audio, # audio buffer
+        }
 
     def execute_action(self):
         # lift, extension, lateral, roll, gripper
         # action_space = [del_extension, del_height, del_lateral, del_roll, del_gripper]
         # action[0] = np.clip(action[0], -0.01, 0.01)
         r = self.r
-
         inputs = self.generate_inputs()
-
         outputs = self.model(inputs) # 11 dimensional
         # w - extend arm
         # s - retract arm
@@ -159,7 +167,7 @@ class RobotNode:
 
         action_idx = torch.argmax(outputs).item()
         print("action: ", inv_mapping[action_idx], "output: ", outputs)
-        big = 0.01
+        big = 0.05
         movement_resolution = {
             0: big,
             1: -big,

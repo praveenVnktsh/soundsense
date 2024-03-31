@@ -8,7 +8,7 @@ from models.baselines.mulsa.src.encoders import (
     make_audio_encoder,
 )
 from models.baselines.mulsa.src.imi_models import Actor
-
+from torchvision import transforms
 import pytorch_lightning as pl
 
 import configargparse
@@ -59,7 +59,41 @@ class MULSAInference(pl.LightningModule):
         a_encoder = make_audio_encoder(args.encoder_dim * args.num_stack, args.norm_audio)
 
         self.actor = Actor(v_encoder, a_encoder, args)
+        
+        # self.transform_cam = T.Compose(
+        #     [
+        #         T.Resize((self.resized_height_v, self.resized_width_v)),
+        #         T.CenterCrop((self._crop_height_v, self._crop_width_v)),
+        #     ]
+        # )
 
-    def forward(self, x):
-        return self.actor(x)
-    
+        # cam_gripper_framestack = torch.stack(
+        #         [
+        #             self.transform_cam(
+        #                 self.load_image(self.trial, "video", timestep)
+        #             )
+        #             for timestep in frame_idx
+        #         ],
+        #         dim=0,
+        #     )
+        
+        self.transform_image = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize((args.resized_height_v, args.resized_width_v)),
+            transforms.ToTensor(),
+        ])
+
+    def forward(self, inp):
+
+        video = inp['video'] #list of images
+        audio = inp['audio']
+
+        audio = torch.tensor(audio).unsqueeze(0)
+
+        video = torch.stack([self.transform_image(img) for img in video], dim=0)
+        video = video.unsqueeze(0)
+        
+        x = video, audio
+        out = self.actor(x)
+        # print(out.shape)
+        return out[0]
