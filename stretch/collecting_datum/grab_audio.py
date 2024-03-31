@@ -62,11 +62,7 @@ if __name__ == '__main__':
 	# print("Starting audio capture at", date)
 	inp = None
 	
-	
-
 	# create listener
-	
-
 	w = None
 	
 	while not rospy.is_shutdown():
