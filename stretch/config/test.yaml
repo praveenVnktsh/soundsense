@@ -1,0 +1,5 @@
+audio_history_seconds: 3
+audio_hz: 16000
+
+camera_stack_images: 6
+camera_id: '/dev/video6'

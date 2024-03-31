@@ -41,3 +41,10 @@ n - open gripper
 Terminal 1 - roslaunch stretch_core stretch_driver.launch
 terminal 2 - grab_audio.py
 terminal 3 - teleop_collector.py (control on this)
+
+
+### README
+
+```shell
+roslaunch audio_capture capture.launch format:="wave"
+```
