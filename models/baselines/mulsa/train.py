@@ -49,7 +49,6 @@ def main(config_path):
         ]
     )
 
-    # TODO: num_workers
     train_loader = DataLoader(train_set, config["batch_size"], num_workers=config["num_workers"])
     val_loader = DataLoader(val_set, 1, num_workers=config["num_workers"], shuffle=False)
 

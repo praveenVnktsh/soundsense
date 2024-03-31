@@ -1,3 +1,4 @@
 experiments/
+*.png
 *.csv
 lightning_logs/

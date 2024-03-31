@@ -49,7 +49,7 @@ class ImitationEpisode(Dataset):
         # Number of images to stack
         self.num_stack = config['num_stack']
         # Number of frames to skip
-        self.frameskip = self.fps * self.audio_len // self.num_stack
+        self.frameskip = self.fps * self.audio_len // self.num_stack + 1
         # Maximum length of images to consider for stacking
         self.max_len = (self.num_stack - 1) * self.frameskip
         # Number of audio samples for one image idx
@@ -165,13 +165,14 @@ class ImitationEpisode(Dataset):
                 ],
                 dim=0,
             )
-            # if idx > 500:
-            #     stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
-            #     stacked = np.hstack(stacked)
-            #     plt.imsave('image.png',stacked) 
-            #     for idx in frame_idx:
-            #         print(self.actions[idx])
-            #     exit()
+            if idx == 200:
+                
+                stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
+                stacked = np.hstack(stacked)
+                plt.imsave('image.png',stacked) 
+                for idx in frame_idx:
+                    print(self.image_paths[idx], idx, self.actions[idx])
+                exit()
         else:
             cam_gripper_framestack = None
 

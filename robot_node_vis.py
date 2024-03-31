@@ -81,7 +81,7 @@ class RobotNode:
         loop_start_time = time.time()
         
         n_stack = self.n_stack_images * self.audio_n_seconds
-        attention_scores = np.array([])
+        attention_scores = []
         while is_run:
             frame = self.get_image()
             if len(self.history['video']) > 0:
@@ -104,6 +104,11 @@ class RobotNode:
                         # cv2.waitKey(1)
                     
                     attention_scores = self.execute_action(attention_scores)
+                    # Save attention scores
+                    with open('your_file.txt', 'w') as f:
+                        for line in attention_scores:
+                            f.write(f"{line}\n")
+                
                 else:
                     print("No frame")
                     is_run = False
@@ -144,7 +149,7 @@ class RobotNode:
         r = self.r
         inputs = self.generate_inputs()
         outputs, weights = self.model(inputs) # 11 dimensional
-        attention_scores = np.append(attention_scores, weights)
+        attention_scores += weights.detch().numpy()
         # w - extend arm
         # s - retract arm
         # a - move left
