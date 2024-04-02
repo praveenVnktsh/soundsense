@@ -78,7 +78,7 @@ class Actor(torch.nn.Module):
             # weights.shape(1,8,1,1)
             mha_out += mlp_inp
             mlp_inp = torch.concat([mha_out[i] for i in range(mha_out.shape[0])], 1)
-            print("mha_out", mha_out.shape, "mlp_inp:", mlp_inp.shape)
+            # print("mha_out", mha_out.shape, "mlp_inp:", mlp_inp.shape)
             mlp_inp = self.bottleneck(mlp_inp)
             # mlp_inp = mha_out.squeeze(0) # [batch, D]
         else:
