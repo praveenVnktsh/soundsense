@@ -2,7 +2,7 @@ import numpy as np
 import rospy
 import time
 from audio_common_msgs.msg import AudioDataStamped, AudioData
-from robot_node_test_with_gt import RobotNode
+from robot_node import RobotNode
 
 if __name__ == "__main__":
     from models.baselines.dummy.model import LitModel 
