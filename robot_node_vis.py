@@ -81,7 +81,7 @@ class RobotNode:
         loop_start_time = time.time()
         
         n_stack = self.n_stack_images * self.audio_n_seconds
-        attention_scores = []
+        attention_scores = np.zeros(shape=(1,8,1,1))
         while is_run:
             frame = self.get_image()
             if len(self.history['video']) > 0:

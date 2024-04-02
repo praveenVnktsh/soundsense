@@ -6,11 +6,11 @@ import cv2
 import yaml
 import rospy
 from audio_common_msgs.msg import AudioDataStamped, AudioData
-
+import glob
 class RobotNode:
     def __init__(self, config_path, model, is_unimodal = False):
-        self.r = stretch_body.robot.Robot()
-        self.boot_robot()
+        # self.r = stretch_body.robot.Robot()
+        # self.boot_robot()
         
         with open(config_path) as info:
             params = yaml.load(info.read(), Loader=yaml.FullLoader)
@@ -30,8 +30,9 @@ class RobotNode:
             audio_sub = rospy.Subscriber('/audio/audio', AudioData, self.callback)
             print("Waiting for audio data...")
             rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
-        self.cap  = cv2.VideoCapture(cam)
+        self.idx = 0
         self.model = model
+        self.images = sorted(glob.glob('/home/hello-robot/soundsense/soundsense/stretch/data/data_simple/6/video/*.png'))
     
     def callback(self, data):
         audio = np.frombuffer(data.data, dtype=np.uint8)
@@ -66,12 +67,14 @@ class RobotNode:
     
     def get_image(self):
         h, w = self.image_shape 
-        ret, frame = self.cap.read()
+        self.idx += 1
+        self.idx = self.idx % len(self.images)
+        path = self.images[self.idx ]
+        frame = cv2.imread(path)
         frame = cv2.resize(frame, (h, w))
+        # frame = np.random.randint(0, 255, (h, w, 3)).astype(np.uint8)
         if self.bgr_to_rgb:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        if not ret:
-            return None
         return frame
 
     def run_loop(self, visualize = False):
@@ -95,67 +98,24 @@ class RobotNode:
                     if len(self.history['video']) > n_stack:
                         self.history['video'] = self.history['video'][-n_stack:]
 
-
-                    # if visualize:
-                        # stacked_inp = np.hstack(self.history['video'])
-                        # cv2.imwrite('stacked_inp.jpg', stacked_inp)
-                        # cv2.imshow('stacked', stacked_inp)
-                        # cv2.waitKey(1)
-                    
+                    # self.generate_inputs()q
                     self.execute_action()
                 else:
                     print("No frame")
                     is_run = False
 
+            time.sleep(0.5)
+
         print("Ending run loop")
-
-    def generate_inputs(self, save = True):
-        
-        video = self.history['video'].copy() # subsample n_frames of interest
-        n_images = len(video)
-
-        choose_every = n_images // self.n_stack_images
-
-        video = video[::choose_every]
-        audio = self.history['audio'].copy()
-
-        # if save:
-        #     stacked = np.hstack(video)
-        #     cv2.imwrite('stacked.jpg', stacked)
-
-        # cam_gripper_framestack,audio_clip_g
-        # vg_inp: [batch, num_stack, 3, H, W]
-        # a_inp: [batch, 1, T]
-        
-        video = video[-self.n_stack_images:]
-        video = [(img).astype(float)/ 255 for img in video]
-        
-        return {
-            'video' : video, # list of images
-            'audio' : audio, # audio buffer
-        }
-
     def execute_action(self):
         # lift, extension, lateral, roll, gripper
         # action_space = [del_extension, del_height, del_lateral, del_roll, del_gripper]
         # action[0] = np.clip(action[0], -0.01, 0.01)
-        r = self.r
+        
         inputs = self.generate_inputs()
-        outputs = self.model(inputs) # 11 dimensional
+        # with torch.no_grad():
+        outputs = self.model(inputs).squeeze() # 11 dimensional
         outputs = torch.nn.functional.softmax(outputs)
-        # w - extend arm
-        # s - retract arm
-        # a - move left
-        # d - move right
-
-        # i - lift up
-        # k - lift down
-
-        # l - roll right
-        # j - roll left
-
-        # m - close gripper
-        # n - open gripper
         mapping = {
             'w': 0, 
             's': 1,
@@ -172,31 +132,33 @@ class RobotNode:
         inv_mapping = {v: k for k, v in mapping.items()}
 
         action_idx = torch.argmax(outputs).item()
-        print("action: ", inv_mapping[action_idx], "output: ", outputs)
-        big = 0.05
-        movement_resolution = {
-            0: big,
-            1: -big,
-            2: big,
-            3: -big,
-            4: 50,
-            5: -50,
-            6: big,
-            7: -big,
-            8: 15 * np.pi/180,
-            9: -15 * np.pi/180,
-        }
-        if action_idx in [0, 1]:
-            r.arm.move_by(movement_resolution[action_idx])
-        elif action_idx in [2, 3]:
-            r.base.translate_by(movement_resolution[action_idx])
-        elif action_idx in [4, 5]:
-            r.end_of_arm.move_by('stretch_gripper', movement_resolution[action_idx])
-        elif action_idx in [8, 9]:
-            r.end_of_arm.move_by('wrist_roll', movement_resolution[action_idx])
-        elif action_idx in [6, 7]:
-            r.lift.move_by(movement_resolution[action_idx])
-        r.push_command()
-        # time.sleep(1)
+        print("action: ", inv_mapping[action_idx], "output: ", outputs.detach().numpy())
+    def generate_inputs(self, save = True):
+        
+        video = self.history['video'].copy() # subsample n_frames of interest
+        n_images = len(video)
 
-        return True
+        choose_every = n_images // self.n_stack_images
+
+        video = video[::choose_every]
+        audio = self.history['audio'].copy()
+
+        if save:
+            stacked = np.hstack(video)
+            # cv2.imwrite('stacked.jpg', stacked)
+            cv2.imshow('stacked', stacked)
+            if cv2.waitKey(1) == ord('q'):
+                exit()
+
+        # cam_gripper_framestack,audio_clip_g
+        # vg_inp: [batch, num_stack, 3, H, W]
+        # a_inp: [batch, 1, T]
+        
+        video = video[-self.n_stack_images:]
+        video = [(img).astype(float)/ 255 for img in video]
+        
+        return {
+            'video' : video, # list of images
+            'audio' : audio, # audio buffer
+        }
+

@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # model = LitModel(action_path = action_path)
     # model.eval()
     # If using MULSA, change out to out[0] in inference.py line 99
-    model_path = "/home/hello-robot/soundsense/soundsense/stretch/models/baselines/mulsa/weights/unimodal/simple_task/03-28-16:48:44-jobid=0-epoch=2-step=2634.ckpt"
+    model_path = "/home/hello-robot/soundsense/soundsense/models/baselines/mulsa/test_models/03-31-18:34:39.ckpt"
     model = MULSAInference.load_from_checkpoint(model_path)
     model.eval()
 

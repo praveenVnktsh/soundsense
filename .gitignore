@@ -17,4 +17,3 @@ baselines/playbyear/hydralogs/
 *.pt
 *.csv
 *.log
-*.npy

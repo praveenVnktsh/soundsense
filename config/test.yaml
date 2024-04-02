@@ -4,4 +4,4 @@ audio_hz: 16000
 camera_stack_images: 6
 camera_id: '/dev/video6'
 camera_inp_h_w: [224, 224]
-bgr_to_rgb: True
+bgr_to_rgb: False

@@ -24,6 +24,8 @@ class LitModel(L.LightningModule):
         if self.counter >= len(self.actions):
             act = torch.zeros((11))
             act[-1] = 1
+
+        
         return act
         
 

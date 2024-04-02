@@ -27,7 +27,7 @@ action_dim: 11
 num_stack: 6
 num_heads: 8
 norm_audio: False
-use_mha: True
+use_mha: False
 aux_multiplier: 1.0
 conv_bottleneck: 128
 modalities: vg #vg or vg_ag
