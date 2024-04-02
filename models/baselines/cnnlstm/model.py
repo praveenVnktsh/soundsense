@@ -44,13 +44,10 @@ class CNNLSTMWithResNetForActionPrediction(pl.LightningModule):
         return out
 
     def training_step(self, batch, batch_idx):
-        if self.audio:
-            audio_obs, obs, actions = batch
-        else:
-            obs, actions = batch
-
-        obs, actions = obs[0], actions[0]
-        print("train", obs.shape, actions.shape)
+        
+        (obs, audio), actions = batch
+        
+        # print("train", obs.shape, actions.shape)
 
         outputs = self(obs)
         loss = nn.functional.cross_entropy(outputs, actions)
@@ -58,11 +55,11 @@ class CNNLSTMWithResNetForActionPrediction(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        inputs, targets = batch
-        inputs, targets = inputs[0], targets[0]
-        print("val", inputs.shape, targets.shape)
-        outputs = self(inputs).squeeze(0)
-        loss = nn.functional.cross_entropy(outputs, targets)
+        (obs, audio), actions = batch
+        # print("val", obs.shape, actions.shape)
+
+        outputs = self(obs)
+        loss = nn.functional.cross_entropy(outputs, actions)
         self.log('val_loss', loss.item())
         return loss
 

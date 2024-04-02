@@ -23,11 +23,11 @@ class MULSAInference(pl.LightningModule):
         a_encoder = make_audio_encoder(self.config['encoder_dim'] * self.config['num_stack'], self.config['norm_audio'])
 
         self.actor = Actor(v_encoder, a_encoder, self.config)
-        self.transform_image = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.Resize((self.config['resized_height_v'], self.config['resized_width_v'])),
-            transforms.ToTensor(),
-        ])
+        # self.transform_image = transforms.Compose([
+        #     transforms.ToPILImage(),
+        #     transforms.Resize((self.config['resized_height_v'], self.config['resized_width_v'])),
+        #     transforms.ToTensor(),
+        # ])
         
 
     def forward(self, inp):

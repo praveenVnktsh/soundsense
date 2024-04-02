@@ -54,7 +54,9 @@ class Actor(torch.nn.Module):
 
         if "vg" in self.modalities:
             batch, num_stack, _, Hv, Wv = vg_inp.shape
+            # print(vg_inp.shape,batch * num_stack, 3, Hv, Wv )
             vg_inp = vg_inp.view(batch * num_stack, 3, Hv, Wv)
+            # print(vg_inp.dtype, vg_inp.shape)
             vg_embeds = self.v_encoder(vg_inp)  # [batch * num_stack, encoder_dim]
             vg_embeds = vg_embeds.view(
                 -1, self.layernorm_embed_shape

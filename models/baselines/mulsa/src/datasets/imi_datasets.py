@@ -12,6 +12,8 @@ import soundfile as sf
 import json
 import glob
 import matplotlib.pyplot as plt
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 class ImitationEpisode(Dataset):
     def __init__(self, 
@@ -64,33 +66,40 @@ class ImitationEpisode(Dataset):
         # self.action_dim = config['action_dim']
         
         if self.train:
-            self.transform_cam = T.Compose(
-                [
-                    T.Resize((self.resized_height_v, self.resized_width_v)),
-                    T.ColorJitter(brightness=0.1, contrast=0.02, saturation=0.02),
-                    T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-                ]
-            )
+            # self.transform_cam = T.Compose(
+            #     [
+            #         T.Resize((self.resized_height_v, self.resized_width_v)),
+            #         T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+            #     ]
+            # )
+            self.transform_cam = A.Compose([
+                A.Resize(height=self.resized_height_v, width=self.resized_width_v),
+                A.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225]),
+                A.RandomBrightnessContrast(p=0.2),  # Random brightness and contrast adjustments with 20% probability
+                A.GaussianBlur(p=0.1),  # Gaussian blur with 10% probability
+                A.ColorJitter(p=0.2),
+                A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=20, p=0.5),
+                ToTensorV2(),
+            ])
+
         else:
-            self.transform_cam = T.Compose(
-                [
-                    T.Resize((self.resized_height_v, self.resized_width_v)),
-                    # T.CenterCrop((self._crop_height_v, self._crop_width_v)),
-                    T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                ]
-            )
+            # self.transform_cam = T.Compose(
+            #     [
+            #         T.Resize((self.resized_height_v, self.resized_width_v)),
+            #         # T.CenterCrop((self._crop_height_v, self._crop_width_v)),
+            #         T.Normalize((128, 128, 128), (128, 128, 128)),
+            #     ]
+            # )
+            self.transform_cam = A.Compose([
+                A.Resize(height=self.resized_height_v, width=self.resized_width_v),
+                ToTensorV2(),
+            ])
 
     def load_image(self, idx):
         img_path = self.image_paths[idx]
-        image = (
-            torch.as_tensor(np.array(Image.open(img_path))).float().permute(2, 0, 1)
-            / 255
-        )
-        # normalization
-        # image -= 0.5
-        # image /= 0.5
+        image = np.array(Image.open(img_path)).astype(np.float32) / 255.0
         
-
         return image
     
     def clip_resample(self, audio, audio_start, audio_end):
@@ -160,12 +169,13 @@ class ImitationEpisode(Dataset):
             cam_gripper_framestack = torch.stack(
                 [
                     self.transform_cam(
-                        self.load_image(i)
-                    )
+                        image = self.load_image(i)
+                    )['image']
                     for i in frame_idx
                 ],
                 dim=0,
             )
+            # print("GRIPPER SEQUENCE LENGTH", len(cam_gripper_framestack), cam_gripper_framestack.shape)
             # if idx == 200:
                 
             #     stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
@@ -180,8 +190,8 @@ class ImitationEpisode(Dataset):
         # Random cropping
         if self.train:
             img = self.transform_cam(
-                self.load_image(idx)
-            )
+                image = self.load_image(idx)
+            )['image']
             if not self.nocrop:
                 i_v, j_v, h_v, w_v = T.RandomCrop.get_params(
                     img, output_size=(self._crop_height_v, self._crop_width_v)
@@ -219,7 +229,7 @@ class ImitationEpisode(Dataset):
             )
         else:
             xyzgt = torch.Tensor(self.actions[idx])
-
+        # print(cam_gripper_framestack.dtype, xyzgt.dtype)
         return (
             (cam_gripper_framestack,
             audio_clip_g,),

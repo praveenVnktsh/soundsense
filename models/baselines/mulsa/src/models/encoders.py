@@ -50,7 +50,7 @@ class Encoder(nn.Module):
         assert len(x.values()) == 1
         x = list(x.values())[0]
         
-        h_v = x.register_hook(self.vision_activation_hook)
+        # h_v = x.register_hook(self.vision_activation_hook)
         self.vision_activations = x
         
         x = self.avgpool(x)
@@ -84,7 +84,7 @@ class Spec_Encoder(Encoder):
         x = super().forward(log_spec)
         self.audio_activations = x
 
-        h_a = x.register_hook(self.audio_activation_hook)
+        # h_a = x.register_hook(self.audio_activation_hook)
         return x
     
     def audio_activation_hook(self, grad):

@@ -31,6 +31,10 @@ def main(config_path):
             for run_id in train_episodes
         ]
     )
+
+    # print(len(train_set))
+    # print("train", train_set[0][0][0].shape, train_set[0][1].shape)
+
     val_set = torch.utils.data.ConcatDataset(
         [
             ImitationEpisode(config, run_id, train=False)
@@ -39,10 +43,14 @@ def main(config_path):
     )
 
     train_loader = DataLoader(train_set, config["batch_size"], num_workers=config["num_workers"])
+
+    # for x, y in train_loader:
+    #     print(x[0].shape, x[1].shape, y.shape)
+    
     val_loader = DataLoader(val_set, 1, num_workers=config["num_workers"], shuffle=False)
 
     # Initialize Lightning Trainer
-    trainer = pl.Trainer(max_epochs=config["max_epochs"], accelerator="auto")
+    trainer = pl.Trainer(max_epochs=config["max_epochs"], accelerator="auto", check_val_every_n_epoch=1)
 
     # Initialize model
     model = CNNLSTMWithResNetForActionPrediction(
