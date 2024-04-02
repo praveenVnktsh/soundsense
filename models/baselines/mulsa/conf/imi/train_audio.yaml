@@ -16,7 +16,7 @@ crop_percent: 0.1
 
 
 # dataset
-dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/hundred/data'
+dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data'
 train_val_split: 0.8
 num_workers: 16
 batch_size: 32
@@ -30,8 +30,8 @@ norm_audio: False
 use_mha: True
 aux_multiplier: 1.0
 conv_bottleneck: 128
-modalities: vg #vg or vg_ag
-stack_actions: False
+modalities: vg_ag #vg or vg_ag
+
 # training params
 lr: 0.0001
 gamma: 0.9
@@ -39,7 +39,7 @@ period: 3
 epochs: 100
 resume: False
 log_dir: '/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/'
-exp_name: 'mulsa_unimodal_simple_task_1'
+exp_name: 'mulsa_multimodal_full_task_1'
 
 
 

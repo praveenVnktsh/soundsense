@@ -1,5 +1,6 @@
 *pyc
 data/calib*
+*.out
 stretch/data*
 *.MP4
 *.mp4

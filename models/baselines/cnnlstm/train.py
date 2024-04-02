@@ -5,7 +5,10 @@ import numpy as np
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from model import CNNLSTMWithResNetForActionPrediction
-from models.baselines.mulsa.src.datasets.imi_datasets import ImitationEpisode
+
+import sys
+sys.path.append('../mulsa/src/datasets/')
+from imi_datasets import ImitationEpisode
 
 
 def main(config_path):
@@ -35,27 +38,24 @@ def main(config_path):
         ]
     )
 
-    # Create datasets
-    # n_history = 10
-    # train_dataset = ActionDataset(root_dir=root_dir, sequence_length=n_history,transform=transform, audio=False)
-    # val_dataset = ActionDataset(root_dir="Dataset/val", transform=transform)
-
-    # Create data loaders
-    # batch_size = 16
-    # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-    # val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=0)
-
     train_loader = DataLoader(train_set, config["batch_size"], num_workers=config["num_workers"])
     val_loader = DataLoader(val_set, 1, num_workers=config["num_workers"], shuffle=False)
 
     # Initialize Lightning Trainer
-    trainer = pl.Trainer(max_epochs=100,)  # Adjust max_epochs and gpus as needed
+    trainer = pl.Trainer(max_epochs=config["max_epochs"], accelerator="auto")
 
     # Initialize model
-    model = CNNLSTMWithResNetForActionPrediction(sequence_length=n_history, lstm_hidden_dim=64, output_dim=11, lstm_layers=2, dropout=0.5, audio=False)
+    model = CNNLSTMWithResNetForActionPrediction(
+        sequence_length=config["num_stack"], 
+        lstm_hidden_dim=config["lstm_hidden_dim"], 
+        output_dim=config["output_dim"], 
+        lstm_layers=config["lstm_layers"], 
+        dropout=config["dropout"], 
+        audio=config["audio"]
+    )
 
     # Start training
-    trainer.fit(model, train_loader)
+    trainer.fit(model, train_loader, val_loader)
 
 
 if __name__ == "__main__":

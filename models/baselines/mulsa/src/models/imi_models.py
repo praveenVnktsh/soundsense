@@ -86,9 +86,17 @@ class Actor(torch.nn.Module):
         # action_logits = self.mlp(mlp_inp)
         xyzgt = self.aux_mlp(mlp_inp)
         # return action_logits, xyzrpy, weights
-        return xyzgt, weights
+        return xyzgt, weights, mlp_inp
+    
+    def get_activations_gradient(self):
+        return self.v_encoder.vision_gradients, self.a_encoder.audio_gradients
 
-
+    def get_activations(self):
+        if "ag" in self.modalities:
+            return self.v_encoder.vision_activations.detach(), self.a_encoder.audio_activations.detach()
+        else:
+            return self.v_encoder.vision_activations.detach(), None
+    
 if __name__ == "__main__":
     pass
     # vision_encoder = make_vision_encoder(128)

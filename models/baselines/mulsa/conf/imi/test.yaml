@@ -31,6 +31,7 @@ use_mha: True
 aux_multiplier: 1.0
 conv_bottleneck: 128
 modalities: vg #vg or vg_ag
+stack_actions: True
 
 # training params
 lr: 0.0001

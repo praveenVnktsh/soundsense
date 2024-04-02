@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as models
@@ -7,16 +8,11 @@ class CNNLSTMWithResNetForActionPrediction(pl.LightningModule):
     def __init__(self, sequence_length, lstm_hidden_dim, output_dim, lstm_layers, dropout, audio=False):
         super(CNNLSTMWithResNetForActionPrediction, self).__init__()
         self.save_hyperparameters()
+
         # Load pretrained ResNet model
         resnet = models.resnet18(pretrained=True)
-        self.resnet = nn.Sequential(*list(resnet.children())[:-1])  # Remove the last fully connected layer
-        
-        # Define LSTM layerwant to keep any logs or checkpoints, and there doesn't appear to be an obvious way to do that.
-        # print(resnet.fc.out_features)
-        # print(lstm_hidden_dim)
-        # print(lstm_layers)
-        # print(dropout)
-
+        # Remove the last fully connected layer
+        self.resnet = nn.Sequential(*list(resnet.children())[:-1])  
 
         self.lstm = nn.LSTM(
             input_size=512, 
@@ -34,12 +30,13 @@ class CNNLSTMWithResNetForActionPrediction(pl.LightningModule):
     def forward(self, x):
         # Extract features using ResNet
         x = x.view(-1, *x.shape[2:])  # [N_batch * N_history, C, H, W]
+
         # Extract features using ResNet
         with torch.no_grad():  # Disable gradient computation for the ResNet backbone
             features = self.resnet(x)
+
         # Apply LSTM
-        features = features.view(x.size(0) // self.num_history, self.num_history, -1)  # [N_batch, N_history, features_size]
-        # print(features.shape)
+        features = features.view(features.size(0) // self.num_history, self.num_history, features.size(1))  # [N_batch, N_history, features_size]
         lstm_out, _ = self.lstm(features)
         # print(lstm_out.shape)
         # Apply fully connected layer for output
@@ -51,20 +48,27 @@ class CNNLSTMWithResNetForActionPrediction(pl.LightningModule):
             audio_obs, obs, actions = batch
         else:
             obs, actions = batch
+
+        obs, actions = obs[0], actions[0]
+        print("train", obs.shape, actions.shape)
+
         outputs = self(obs)
         loss = nn.functional.cross_entropy(outputs, actions)
-        self.log('train_loss', loss)
+        self.log('train_loss', loss.item())
         return loss
 
     def validation_step(self, batch, batch_idx):
         inputs, targets = batch
-        outputs = self(inputs)
+        inputs, targets = inputs[0], targets[0]
+        print("val", inputs.shape, targets.shape)
+        outputs = self(inputs).squeeze(0)
         loss = nn.functional.cross_entropy(outputs, targets)
-        self.log('val_loss', loss)
+        self.log('val_loss', loss.item())
         return loss
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=1e-3)
 
 # Example usage:
+
 # model = CNNLSTMWithResNetForActionPrediction(lstm_hidden_dim=64, output_dim=11, lstm_layers=2, dropout=0.5)

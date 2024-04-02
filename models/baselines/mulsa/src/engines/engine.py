@@ -36,7 +36,7 @@ class ImiEngine(LightningModule):
         # use idx in batch for debugging
         inputs, xyzgt_gt = batch
         # print("training_step input shape", inputs[0].size())
-        xyzgt_pred, weights = self.actor(inputs)  # , idx)
+        xyzgt_pred, weights, _ = self.actor(inputs)  # , idx)
         loss = self.compute_loss(xyzgt_gt, xyzgt_pred)
         self.log_dict(
             {"train/loss": loss}, prog_bar=True, on_epoch=True
@@ -53,7 +53,7 @@ class ImiEngine(LightningModule):
         #     demo, action_logits, xyzrpy_gt, xyzrpy_pred
         # )
         inputs, xyzgt_gt = batch
-        xyzgt_pred, weights = self.actor(inputs)  # , idx)
+        xyzgt_pred, weights, _ = self.actor(inputs)  # , idx)
         loss = self.compute_loss(xyzgt_gt, xyzgt_pred)
         self.log_dict(
             {"val/loss": loss}, prog_bar=True, on_epoch=True

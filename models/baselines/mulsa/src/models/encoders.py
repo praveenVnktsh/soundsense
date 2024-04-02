@@ -41,18 +41,26 @@ class Encoder(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         if out_dim is not None:
             self.fc = nn.Linear(512, out_dim)
+        self.vision_gradients = None
+        self.vision_activations = None
 
     def forward(self, x):
         x = self.coord_conv(x)
         x = self.feature_extractor(x)
         assert len(x.values()) == 1
         x = list(x.values())[0]
+        
+        h_v = x.register_hook(self.vision_activation_hook)
+        self.vision_activations = x
+        
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         if self.fc is not None:
             x = self.fc(x)
         return x
 
+    def vision_activation_hook(self, grad):
+        self.vision_gradients = grad
 
 class Spec_Encoder(Encoder):
     def __init__(self, feature_extractor, out_dim=None, norm_audio=False):
@@ -62,6 +70,8 @@ class Spec_Encoder(Encoder):
         self.mel = torchaudio.transforms.MelSpectrogram(
             sample_rate=sr, n_fft=int(sr * 0.025), hop_length=int(sr * 0.01), n_mels=64
         )
+        self.audio_gradients = None
+        self.audio_activations = None
 
     def forward(self, waveform):
         EPS = 1e-8
@@ -71,7 +81,14 @@ class Spec_Encoder(Encoder):
         assert log_spec.size(-2) == 64
         if self.norm_audio:
             log_spec /= log_spec.sum(dim=-2, keepdim=True)  # [1, 64, 100]
-        return super().forward(log_spec)
+        x = super().forward(log_spec)
+        self.audio_activations = x
+
+        h_a = x.register_hook(self.audio_activation_hook)
+        return x
+    
+    def audio_activation_hook(self, grad):
+        self.audio_gradients = grad
 
 
 
@@ -107,4 +124,4 @@ def make_audio_encoder(out_dim=None, norm_audio=False):
 if __name__ == "__main__":
     inp = torch.zeros((1, 3, 480, 640))
     encoder = make_vision_encoder(64, 1280)
-    print(encoder(inp).shape)
+    # print(encoder(inp).shape)

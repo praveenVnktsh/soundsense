@@ -24,8 +24,10 @@ def start_training(config, exp_dir, pl_module, monitor="val/loss"):
     jobid = np.random.randint(0, 1000)
     jobid = os.environ.get("SLURM_JOB_ID", 0)
     exp_time = datetime.now().strftime("%m-%d-%H:%M:%S") 
+    dirpath = os.path.join(exp_dir, "lightning_logs/", config['exp_name'] +exp_time,)
+    print("DIRPATH==", dirpath)
     checkpoint = ModelCheckpoint(
-        dirpath=os.path.join(exp_dir, "checkpoints", config['exp_name']),
+        dirpath=dirpath,
         filename=exp_time ,
         save_top_k=4,
         save_last=True,
@@ -34,7 +36,7 @@ def start_training(config, exp_dir, pl_module, monitor="val/loss"):
     )
 
     logger = TensorBoardLogger(
-        save_dir=exp_dir, version=exp_time + config['exp_name'], name="lightning_logs"
+        save_dir=exp_dir, version=config['exp_name'] + exp_time, name="lightning_logs"
     )
     trainer = Trainer(
         max_epochs=config['epochs'],

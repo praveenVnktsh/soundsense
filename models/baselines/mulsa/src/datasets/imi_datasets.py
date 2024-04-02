@@ -43,7 +43,7 @@ class ImitationEpisode(Dataset):
         self.resized_width_v = config['resized_width_v']
         self.nocrop = not config['is_crop']
         self.crop_percent = config['crop_percent']
-
+        self.stack_actions = config['stack_actions']
         self.dataset_root = config['dataset_root']
         
         # Number of images to stack
@@ -121,6 +121,7 @@ class ImitationEpisode(Dataset):
             actions = json.load(ts)
 
         if "ag" in self.modalities:
+            print("Loading audio for", episode_folder[-5:])
             if os.path.exists(os.path.join(episode_folder, "processed_audio.wav")):
                 audio_gripper1 = sf.read(os.path.join(episode_folder, "processed_audio.wav"))[0]
             else:
@@ -159,20 +160,20 @@ class ImitationEpisode(Dataset):
             cam_gripper_framestack = torch.stack(
                 [
                     self.transform_cam(
-                        self.load_image(idx)
+                        self.load_image(i)
                     )
-                    for idx in frame_idx
+                    for i in frame_idx
                 ],
                 dim=0,
             )
-            if idx == 200:
+            # if idx == 200:
                 
-                stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
-                stacked = np.hstack(stacked)
-                plt.imsave('image.png',stacked) 
-                for idx in frame_idx:
-                    print(self.image_paths[idx], idx, self.actions[idx])
-                exit()
+            #     stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
+            #     stacked = np.hstack(stacked)
+            #     plt.imsave('image.png',stacked) 
+            #     for idx in frame_idx:
+            #         print(self.image_paths[idx], idx, self.actions[idx])
+            #     exit()
         else:
             cam_gripper_framestack = None
 
@@ -208,7 +209,16 @@ class ImitationEpisode(Dataset):
         else:
             audio_clip_g = 0
  
-        xyzgt = torch.Tensor(self.actions[idx])
+        if self.stack_actions:
+            xyzgt = torch.stack(
+                [
+                    torch.Tensor(self.actions[i])
+                    for i in frame_idx
+                ],
+                dim=0,
+            )
+        else:
+            xyzgt = torch.Tensor(self.actions[idx])
 
         return (
             (cam_gripper_framestack,
