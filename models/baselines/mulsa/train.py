@@ -1,7 +1,12 @@
 import torch
 torch.set_num_threads(1)
 import yaml
-from src.datasets.imi_datasets import ImitationEpisode
+import sys
+import os
+sys.path.append(f'{os.environ['SOUNDSENSE_ROOT']}/models')
+os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
+
+from imi_datasets import ImitationEpisode
 from src.models.encoders import (
     make_vision_encoder,
     make_audio_encoder,
@@ -17,7 +22,7 @@ import os
 torch.multiprocessing.set_sharing_strategy("file_system")
 import sys
 torch.set_float32_matmul_precision('medium')
-os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
+
 print(sys.version)
 print(torch.__version__)
 print(torch.version.cuda)
@@ -53,7 +58,7 @@ def main(config_path):
 
     train_loader = DataLoader(train_set, config["batch_size"], num_workers=config["num_workers"])
     val_loader = DataLoader(val_set, config["batch_size"], num_workers=config["num_workers"], shuffle=False)
-
+    
     v_encoder = make_vision_encoder(config['encoder_dim'])
     a_encoder = make_audio_encoder(config['encoder_dim'] * config['num_stack'], config['norm_audio'])
 

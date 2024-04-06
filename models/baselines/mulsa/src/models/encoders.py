@@ -74,7 +74,8 @@ class Spec_Encoder(Encoder):
         self.audio_activations = None
 
     def forward(self, waveform):
-        EPS = 1e-8
+        # EPS = 1e-8
+        EPS = 1
         # print("waveform ",(waveform.size()))
         spec = self.mel(waveform.float())
         log_spec = torch.log(spec + EPS)

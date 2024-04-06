@@ -43,8 +43,8 @@ class ImitationEpisode(Dataset):
         self.modalities = config['modalities'].split("_")
         self.resized_height_v = config['resized_height_v']
         self.resized_width_v = config['resized_width_v']
-        self.nocrop = not config['is_crop']
-        self.crop_percent = config['crop_percent']
+        # self.nocrop = not config['is_crop']
+        # self.crop_percent = config['crop_percent']
         self.stack_actions = config['stack_actions']
         self.dataset_root = config['dataset_root']
         
@@ -55,14 +55,14 @@ class ImitationEpisode(Dataset):
         # Maximum length of images to consider for stacking
         self.max_len = (self.num_stack - 1) * self.frameskip
         # Number of audio samples for one image idx
-        self.resolution = self.sample_rate_audio // self.fps  
         
         # augmentation parameters
-        self._crop_height_v = int(self.resized_height_v * (1.0 - self.crop_percent))
-        self._crop_width_v = int(self.resized_width_v * (1.0 - self.crop_percent))
+        # self._crop_height_v = int(self.resized_height_v * (1.0 - self.crop_percent))
+        # self._crop_width_v = int(self.resized_width_v * (1.0 - self.crop_percent))
 
         self.actions, self.audio_gripper, self.episode_length, self.image_paths = self.get_episode()
 
+        self.resolution = (self.audio_gripper.numel()) // self.episode_length
         # self.action_dim = config['action_dim']
         
         if self.train:
@@ -72,34 +72,63 @@ class ImitationEpisode(Dataset):
             #         T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             #     ]
             # )
+            p_apply = np.array([
+                1, 1, 1, 0.1
+            ], dtype=np.float32)
+            p_apply /= p_apply.sum()
+            p_apply *= 0.5
+            self.transform_cam = A.Compose([
+                A.Resize(height=self.resized_height_v, width=self.resized_width_v),
+                A.GaussianBlur(
+                    sigma_limit=(0.2, 0.6),
+                    p=p_apply[0]
+                ),  # Gaussian blur with 10% probability
+                A.OneOf([
+                    A.RandomBrightnessContrast(
+                        brightness_limit=0.15,
+                        contrast_limit=0.15,
+                        p = 0.5,
+                    ),# Random brightness and contrast adjustments with 20% probability
+                    A.ColorJitter(
+                        brightness=0, contrast=0, saturation=0, hue=0.1,
+                        p = 0.5
+                    ),
+                ], p=p_apply[1]),
+                A.ShiftScaleRotate(
+                    shift_limit=0.1, 
+                    scale_limit=0.1, 
+                    rotate_limit=15, 
+                    p=p_apply[2]
+                ),
+                A.ZoomBlur(
+                    max_factor=1.11,
+                    p = p_apply[3]
+                ),
+                A.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
+                ToTensorV2(),
+            ], additional_targets= {
+                f'image{i}': 'image' for i in range(self.num_stack)})
+
+        else:
             self.transform_cam = A.Compose([
                 A.Resize(height=self.resized_height_v, width=self.resized_width_v),
                 A.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225]),
-                A.RandomBrightnessContrast(p=0.2),  # Random brightness and contrast adjustments with 20% probability
-                A.GaussianBlur(p=0.1),  # Gaussian blur with 10% probability
-                A.ColorJitter(p=0.2),
-                A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=20, p=0.5),
+                                 std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
                 ToTensorV2(),
             ])
 
-        else:
-            # self.transform_cam = T.Compose(
-            #     [
-            #         T.Resize((self.resized_height_v, self.resized_width_v)),
-            #         # T.CenterCrop((self._crop_height_v, self._crop_width_v)),
-            #         T.Normalize((128, 128, 128), (128, 128, 128)),
-            #     ]
-            # )
-            self.transform_cam = A.Compose([
-                A.Resize(height=self.resized_height_v, width=self.resized_width_v),
-                ToTensorV2(),
-            ])
+        if 'ag' in self.modalities:
+            self.mel = torchaudio.transforms.MelSpectrogram(
+                sample_rate=self.resample_rate_audio, 
+                n_fft=512, 
+                hop_length=int(self.resample_rate_audio * 0.01), 
+                n_mels=64
+            )
 
     def load_image(self, idx):
         img_path = self.image_paths[idx]
-        image = np.array(Image.open(img_path)).astype(np.float32) / 255.0
-        
+        image = np.array(Image.open(img_path)).astype(np.float32) / 255.0 # RGB FORMAT ONLY
         return image
     
     def clip_resample(self, audio, audio_start, audio_end):
@@ -114,7 +143,8 @@ class ImitationEpisode(Dataset):
         audio_clip = torch.cat(
             [left_pad, audio[:, audio_start:audio_end], right_pad], dim=1
         )
-        # print(f"start {audio_start}, end {audio_end} left {left_pad.size()}, right {right_pad.size()}. audio_clip {audio_clip.size()}")
+        print(f"start {audio_start}, end {audio_end} left {left_pad.size()}, right {right_pad.size()}. audio_clip {audio_clip.size()}")
+        print(audio.shape)
         audio_clip = torchaudio.functional.resample(audio_clip, self.sample_rate_audio, self.resample_rate_audio)
         # print("Inside clip_resample output shape", audio_clip.shape)
         
@@ -166,24 +196,17 @@ class ImitationEpisode(Dataset):
     
         if "vg" in self.modalities:
             # stacks from oldest to newest left to right!!!!
-            cam_gripper_framestack = torch.stack(
-                [
-                    self.transform_cam(
-                        image = self.load_image(i)
-                    )['image']
-                    for i in frame_idx
-                ],
-                dim=0,
-            )
-            # print("GRIPPER SEQUENCE LENGTH", len(cam_gripper_framestack), cam_gripper_framestack.shape)
-            # if idx == 200:
-                
-            #     stacked = [img.permute(1, 2, 0).numpy()*0.5 + 0.5 for img in cam_gripper_framestack]
-            #     stacked = np.hstack(stacked)
-            #     plt.imsave('image.png',stacked) 
-            #     for idx in frame_idx:
-            #         print(self.image_paths[idx], idx, self.actions[idx])
-            #     exit()
+            if self.train:
+                images = {f'image{i}' : self.load_image(fidx) for i, fidx in enumerate(frame_idx)}
+                images['image'] = images['image0']
+                transformed = self.transform_cam(**images)
+                cam_gripper_framestack = torch.stack(
+                    [
+                        transformed[f'image{i}']
+                        for i in range(len(frame_idx))
+                    ],
+                    dim=0,
+                )
         else:
             cam_gripper_framestack = None
 
@@ -192,18 +215,9 @@ class ImitationEpisode(Dataset):
             img = self.transform_cam(
                 image = self.load_image(idx)
             )['image']
-            if not self.nocrop:
-                i_v, j_v, h_v, w_v = T.RandomCrop.get_params(
-                    img, output_size=(self._crop_height_v, self._crop_width_v)
-                )
-            else:
-                i_v, h_v = (
-                    self.resized_height_v - self._crop_height_v
-                ) // 2, self._crop_height_v
-                j_v, w_v = (
-                    self.resized_width_v - self._crop_width_v
-                ) // 2, self._crop_width_v
-
+            
+            i_v, h_v = 0, self.resized_height_v
+            j_v, w_v = 0, self.resized_width_v
             if "vg" in self.modalities:
                 cam_gripper_framestack = cam_gripper_framestack[
                     ..., i_v : i_v + h_v, j_v : j_v + w_v
@@ -211,11 +225,24 @@ class ImitationEpisode(Dataset):
 
         audio_end = idx * self.resolution
         audio_start = audio_end - self.audio_len * self.sample_rate_audio
+        print(self.sample_rate_audio, self.resolution)
+        print(audio_start, audio_end, (self.audio_gripper.shape))
         
         if self.audio_gripper is not None:
             audio_clip_g = self.clip_resample(
                 self.audio_gripper, audio_start, audio_end
             ).float()
+
+            
+            sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
+
+            mel = self.mel(audio_clip_g)
+            mel = np.log(mel + 1e-8)
+            plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
+            # plot the raw waveform
+
+            
+            
         else:
             audio_clip_g = 0
  
@@ -235,3 +262,39 @@ class ImitationEpisode(Dataset):
             audio_clip_g,),
             xyzgt,
         )
+    
+if __name__ == "__main__":
+    import os
+    os.makedirs('temp', exist_ok=True)
+    dataset = ImitationEpisode(
+        config = {
+            'fps': 30,
+            'audio_len': 3,
+            'sample_rate_audio': 48000,
+            'resample_rate_audio': 16000,
+            'modalities': 'vg_ag',
+            'resized_height_v': 75,
+            'resized_width_v': 100,
+            'is_crop': False,
+            'crop_percent': 0.1,
+            'stack_actions': True,
+            'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
+            'num_stack': 3,
+        },
+        run_id = "0",
+        train=True
+    )
+    print("Dataset size", len(dataset))
+    i = 78
+    (cam_gripper_framestack, audio_clip_g), xyzgt = dataset[i]
+    # print(cam_gripper_framestack.shape, audio_clip_g.shape, xyzgt.shape)
+    # save images
+    stacked = []
+    for idx, img in enumerate(cam_gripper_framestack):
+        img = img.permute(1, 2, 0).numpy() * 0.28 + 0.48
+        # img = img.permute(1, 2, 0).numpy()
+        # print(img.min(), img.max())
+        img = np.clip(img, 0, 1)
+        stacked.append(img.copy())
+    stacked = np.vstack(stacked)
+    plt.imsave(f'temp/0.png', stacked)
