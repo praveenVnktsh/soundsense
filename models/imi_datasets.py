@@ -62,8 +62,8 @@ class ImitationEpisode(Dataset):
         # self._crop_width_v = int(self.resized_width_v * (1.0 - self.crop_percent))
 
         self.actions, self.audio_gripper, self.episode_length, self.image_paths = self.get_episode()
-
-        self.resolution = (self.audio_gripper.numel()) // self.episode_length
+        if self.audio_gripper is not None:
+            self.resolution = (self.audio_gripper.numel()) // self.episode_length
         # self.action_dim = config['action_dim']
         
         if self.train:
@@ -214,28 +214,40 @@ class ImitationEpisode(Dataset):
                     ],
                     dim=0,
                 )
+            else:
+                cam_gripper_framestack = torch.stack(
+                    [
+                        self.transform_cam(
+                            image = self.load_image(fidx)
+                        )['image']
+                        for fidx in frame_idx
+                    ],
+                    dim=0,
+                )
+            
         else:
-            cam_gripper_framestack = None
+            cam_gripper_framestack = 0
 
         # Random cropping
-        if self.train:
-            img = self.transform_cam(
-                image = self.load_image(idx)
-            )['image']
+        # if self.train:
+        #     img = self.transform_cam(
+        #         image = self.load_image(idx)
+        #     )['image']
             
-            i_v, h_v = 0, self.resized_height_v
-            j_v, w_v = 0, self.resized_width_v
-            if "vg" in self.modalities:
-                cam_gripper_framestack = cam_gripper_framestack[
-                    ..., i_v : i_v + h_v, j_v : j_v + w_v
-                ]
+        #     i_v, h_v = 0, self.resized_height_v
+        #     j_v, w_v = 0, self.resized_width_v
+        #     if "vg" in self.modalities:
+        #         cam_gripper_framestack = cam_gripper_framestack[
+        #             ..., i_v : i_v + h_v, j_v : j_v + w_v
+        #         ]
 
-        audio_end = idx * self.resolution
-        audio_start = audio_end - self.audio_len * self.sample_rate_audio
+        
         # print(self.sample_rate_audio, self.resolution)
         # print(audio_start, audio_end, (self.audio_gripper.shape))
         
         if self.audio_gripper is not None:
+            audio_end = idx * self.resolution
+            audio_start = audio_end - self.audio_len * self.sample_rate_audio
             audio_clip_g = self.clip_resample(
                 self.audio_gripper, audio_start, audio_end
             ).float()
@@ -251,7 +263,7 @@ class ImitationEpisode(Dataset):
             plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
             # plot the raw waveform
         else:
-            mel = None
+            mel = 0
  
         if self.stack_actions:
             xyzgt = torch.stack(
@@ -263,7 +275,8 @@ class ImitationEpisode(Dataset):
             )
         else:
             xyzgt = torch.Tensor(self.actions[idx])
-        # print(cam_gripper_framestack.dtype, xyzgt.dtype)
+        
+        # print(cam_gripper_framestack.shape, mel.shape, xyzgt.shape)
         return (
             (cam_gripper_framestack,
             mel),

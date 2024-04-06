@@ -3,7 +3,7 @@ torch.set_num_threads(1)
 import yaml
 import sys
 import os
-sys.path.append(f'{os.environ['SOUNDSENSE_ROOT']}/models')
+sys.path.append(f'{os.environ["SOUNDSENSE_ROOT"]}/models')
 os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
 
 from imi_datasets import ImitationEpisode
