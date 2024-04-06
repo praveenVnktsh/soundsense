@@ -150,8 +150,7 @@ class ImitationEpisode(Dataset):
         audio_clip = torch.cat(
             [left_pad, audio[:, audio_start:audio_end], right_pad], dim=1
         )
-        print(f"start {audio_start}, end {audio_end} left {left_pad.size()}, right {right_pad.size()}. audio_clip {audio_clip.size()}")
-        print(audio.shape)
+        
         audio_clip = torchaudio.functional.resample(audio_clip, self.sample_rate_audio, self.resample_rate_audio)
         # print("Inside clip_resample output shape", audio_clip.shape)
         
