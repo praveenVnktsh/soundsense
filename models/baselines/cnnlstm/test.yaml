@@ -1,0 +1,37 @@
+# Dataset
+dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/hundred/data'
+train_val_split: 0.8
+batch_size: 32
+num_workers: 0
+
+# image 
+stack_actions: True
+fps: 10 #capture image fps
+num_stack: 6
+resized_height_v: 75
+resized_width_v: 100
+
+sample_rate_audio: 48000
+resample_rate_audio: 16000
+audio_len: 3 #audio length in seconds
+
+# train augmentation
+is_crop: True
+crop_percent: 0.1
+augmentations: False
+
+# model params
+lstm_hidden_dim: 64
+lstm_layers: 2
+output_dim: 11
+dropout: 0.5
+audio: False
+modalities: vg # vg_ag
+
+# training params
+max_epochs: 100
+gradcam: True
+
+
+
+
