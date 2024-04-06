@@ -69,7 +69,7 @@ class RobotNode:
         h, w = self.image_shape 
         self.idx += 1
         self.idx = self.idx % len(self.images)
-        path = self.images[self.idx ]
+        path = self.images[self.idx]
         frame = cv2.imread(path)
         frame = cv2.resize(frame, (h, w))
         # frame = np.random.randint(0, 255, (h, w, 3)).astype(np.uint8)
@@ -155,7 +155,7 @@ class RobotNode:
         # a_inp: [batch, 1, T]
         
         video = video[-self.n_stack_images:]
-        video = [(img).astype(float)/ 255 for img in video]
+        video = [(img).astype(np.float32)/ 255.0 for img in video]
         
         return {
             'video' : video, # list of images
