@@ -47,6 +47,7 @@ class ImitationEpisode(Dataset):
         # self.crop_percent = config['crop_percent']
         self.stack_actions = config['stack_actions']
         self.dataset_root = config['dataset_root']
+        self.norm_audio = config['norm_audio']
         
         # Number of images to stack
         self.num_stack = config['num_stack']
@@ -113,8 +114,13 @@ class ImitationEpisode(Dataset):
         else:
             self.transform_cam = A.Compose([
                 A.Resize(height=self.resized_height_v, width=self.resized_width_v),
-                A.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
+                A.Normalize(
+                    # mean=0.5,
+                    # std=0.5,
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225], 
+                    max_pixel_value= 1.0
+                ),
                 ToTensorV2(),
             ])
 
@@ -129,6 +135,7 @@ class ImitationEpisode(Dataset):
     def load_image(self, idx):
         img_path = self.image_paths[idx]
         image = np.array(Image.open(img_path)).astype(np.float32) / 255.0 # RGB FORMAT ONLY
+        
         return image
     
     def clip_resample(self, audio, audio_start, audio_end):
@@ -225,26 +232,26 @@ class ImitationEpisode(Dataset):
 
         audio_end = idx * self.resolution
         audio_start = audio_end - self.audio_len * self.sample_rate_audio
-        print(self.sample_rate_audio, self.resolution)
-        print(audio_start, audio_end, (self.audio_gripper.shape))
+        # print(self.sample_rate_audio, self.resolution)
+        # print(audio_start, audio_end, (self.audio_gripper.shape))
         
         if self.audio_gripper is not None:
             audio_clip_g = self.clip_resample(
                 self.audio_gripper, audio_start, audio_end
             ).float()
-
-            
-            sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
-
             mel = self.mel(audio_clip_g)
             mel = np.log(mel + 1e-8)
+            if self.norm_audio:
+                mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
+                mel -= mel.mean()
+                mel /= (mel.std())
+            
+            # testing
+            sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
             plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
             # plot the raw waveform
-
-            
-            
         else:
-            audio_clip_g = 0
+            mel = None
  
         if self.stack_actions:
             xyzgt = torch.stack(
@@ -259,7 +266,7 @@ class ImitationEpisode(Dataset):
         # print(cam_gripper_framestack.dtype, xyzgt.dtype)
         return (
             (cam_gripper_framestack,
-            audio_clip_g,),
+            mel),
             xyzgt,
         )
     
@@ -279,22 +286,26 @@ if __name__ == "__main__":
             'crop_percent': 0.1,
             'stack_actions': True,
             'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
-            'num_stack': 3,
+            'num_stack': 6,
+            'norm_audio' : True
         },
         run_id = "0",
         train=True
     )
     print("Dataset size", len(dataset))
-    i = 78
-    (cam_gripper_framestack, audio_clip_g), xyzgt = dataset[i]
+    i = 220
+    (cam_gripper_framestack, mel_spec), xyzgt = dataset[i]
     # print(cam_gripper_framestack.shape, audio_clip_g.shape, xyzgt.shape)
     # save images
     stacked = []
+    print("actions", xyzgt.shape)
+    print("melspec", mel_spec.shape, "min", mel_spec.min(), "max", mel_spec.max())
     for idx, img in enumerate(cam_gripper_framestack):
+        print("image ", idx, "min", img.min(), "max", img.max())
         img = img.permute(1, 2, 0).numpy() * 0.28 + 0.48
-        # img = img.permute(1, 2, 0).numpy()
-        # print(img.min(), img.max())
         img = np.clip(img, 0, 1)
         stacked.append(img.copy())
     stacked = np.vstack(stacked)
     plt.imsave(f'temp/0.png', stacked)
+
+    

@@ -58,7 +58,7 @@ def main(config_path):
 
     train_loader = DataLoader(train_set, config["batch_size"], num_workers=config["num_workers"])
     val_loader = DataLoader(val_set, config["batch_size"], num_workers=config["num_workers"], shuffle=False)
-    
+
     v_encoder = make_vision_encoder(config['encoder_dim'])
     a_encoder = make_audio_encoder(config['encoder_dim'] * config['num_stack'], config['norm_audio'])
 
@@ -78,11 +78,13 @@ def main(config_path):
 
 if __name__ == "__main__":
     import sys
-    print(len(sys.argv))
-    if len(sys.argv) > 1:
-        config_path = sys.argv[1]    
-    else:
-        config_path = 'conf/imi/train.yaml'
+    
+    if len(sys.argv) < 2:
+        print("Usage: python train.py <config_path>")
+        exit(0)
+
+    config_path = sys.argv[1]    
+
 
     print("CONFIG PATH: ", config_path)
     main(config_path = config_path)

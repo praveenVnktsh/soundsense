@@ -67,21 +67,21 @@ class Spec_Encoder(Encoder):
         super().__init__(feature_extractor, out_dim)
         self.norm_audio = norm_audio
         sr = 16000
-        self.mel = torchaudio.transforms.MelSpectrogram(
-            sample_rate=sr, n_fft=int(sr * 0.025), hop_length=int(sr * 0.01), n_mels=64
-        )
+        # self.mel = torchaudio.transforms.MelSpectrogram(
+        #     sample_rate=sr, n_fft=int(sr * 0.025), hop_length=int(sr * 0.01), n_mels=64
+        # )
         self.audio_gradients = None
         self.audio_activations = None
 
-    def forward(self, waveform):
+    def forward(self, log_spec):
         # EPS = 1e-8
         EPS = 1
         # print("waveform ",(waveform.size()))
-        spec = self.mel(waveform.float())
-        log_spec = torch.log(spec + EPS)
-        assert log_spec.size(-2) == 64
-        if self.norm_audio:
-            log_spec /= log_spec.sum(dim=-2, keepdim=True)  # [1, 64, 100]
+        # spec = self.mel(waveform.float())
+        # log_spec = torch.log(spec + EPS)
+        # assert log_spec.size(-2) == 64
+        # if self.norm_audio:
+        #     log_spec /= log_spec.sum(dim=-2, keepdim=True)  # [1, 64, 100]
         x = super().forward(log_spec)
         self.audio_activations = x
 
