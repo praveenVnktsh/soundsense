@@ -40,6 +40,9 @@ def main(config_path):
     train_episodes = run_ids[:split]
     val_episodes = run_ids[split:]
 
+    # train_episodes = run_ids[:3]
+    # val_episodes = run_ids[:1]
+
     print("Train episodes: ", len(train_episodes))
     print("Val episodes: ", len(val_episodes))
 

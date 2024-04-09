@@ -169,6 +169,7 @@ class ImitationEpisode(Dataset):
             print("Loading audio for", episode_folder[-5:])
             if os.path.exists(os.path.join(episode_folder, "processed_audio.wav")):
                 audio_gripper1 = sf.read(os.path.join(episode_folder, "processed_audio.wav"))[0]
+                # print("Audio loaded")
             else:
                 audio_gripper1 = None
             
@@ -181,7 +182,10 @@ class ImitationEpisode(Dataset):
             audio_gripper = None
 
         image_paths = sorted(glob.glob(f'{self.dataset_root}/{self.run_id}/video/*.png'))
-
+        if len(actions) != len(image_paths):
+            print("Mismatch", len(actions) - len(image_paths), self.run_id)
+            exit()
+            
         return (
             actions,
             audio_gripper,
@@ -251,15 +255,17 @@ class ImitationEpisode(Dataset):
                 self.audio_gripper, audio_start, audio_end
             ).float()
             mel = self.mel(audio_clip_g)
-            mel = np.log(mel + 1e-8)
+            mel = np.log(mel + 1)
             if self.norm_audio:
                 mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
                 mel -= mel.mean()
-                mel /= (mel.std())
+                
+
+                # print("mel", mel.min(), mel.max(), mel.mean(), mel.std())
             
             # testing
-            sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
-            plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
+            # sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
+            # plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
             # plot the raw waveform
         else:
             mel = 0

@@ -2,3 +2,4 @@ experiments/
 *.png
 *.csv
 lightning_logs/
+trained_models/

@@ -63,7 +63,7 @@ class Actor(torch.nn.Module):
             )  # [batch, encoder_dim * num_stack]
             embeds.append(vg_embeds)
         if "ag" in self.modalities:
-            batch, _, _ = audio_g.shape
+            # batch, _, _ = audio_g.shape
             ag_embeds = self.a_encoder(audio_g)
             ag_embeds = ag_embeds.view(-1, self.layernorm_embed_shape)
             embeds.append(ag_embeds)
