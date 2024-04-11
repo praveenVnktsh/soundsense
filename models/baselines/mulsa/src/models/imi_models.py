@@ -21,6 +21,7 @@ class Actor(torch.nn.Module):
         self.encoder_dim = config["encoder_dim"]
         self.use_mha = config["use_mha"]
         self.modalities = config["modalities"].split("_")
+        self.seq_pred = config["stack_future_actions"]
     
         self.query = nn.Parameter(torch.randn(1, 1, self.layernorm_embed_shape))
         self.embed_dim = self.layernorm_embed_shape * len(self.modalities)
@@ -39,6 +40,7 @@ class Actor(torch.nn.Module):
         #     torch.nn.Linear(1024, 3**3),
         # )
         self.aux_mlp = torch.nn.Linear(self.layernorm_embed_shape, config["action_dim"]) #6
+        self.seq_pred_mlp = torch.nn.Linear(self.layernorm_embed_shape, config["stack_future_actions_dim"]*config["action_dim"]) #6
 
     def forward(self, inputs):
         """
@@ -88,9 +90,13 @@ class Actor(torch.nn.Module):
             weights = None
 
         # action_logits = self.mlp(mlp_inp)
-        xyzgt = self.aux_mlp(mlp_inp)
-        # return action_logits, xyzrpy, weights
-        return xyzgt, weights, mlp_inp
+        if self.seq_pred:
+            seq_pred = self.seq_pred_mlp(mlp_inp)
+            return seq_pred, weights, mlp_inp
+        else:
+            xyzgt = self.aux_mlp(mlp_inp)
+            # return action_logits, xyzrpy, weights
+            return xyzgt, weights, mlp_inp
     
     def get_activations_gradient(self):
         return self.v_encoder.vision_gradients, self.a_encoder.audio_gradients

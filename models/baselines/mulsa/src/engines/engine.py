@@ -29,7 +29,11 @@ class ImiEngine(LightningModule):
         print("baseline learn")
 
     def compute_loss(self, xyz_gt, xyz_pred):
-        loss = self.loss_cce(xyz_pred, xyz_gt)
+        # print("xyz_pred", xyz_pred.size())
+        # print("xyz_gt", xyz_gt.size())
+        loss = self.loss_cce(xyz_pred, xyz_gt.view(xyz_gt.size(0), -1))
+        # if self.config["stack_future_actions"]:
+        #     loss = torch.mean(loss)
         return loss
 
     def training_step(self, batch, batch_idx):
