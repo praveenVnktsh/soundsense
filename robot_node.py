@@ -97,10 +97,10 @@ class RobotNode:
 
 
                     # if visualize:
-                        # stacked_inp = np.hstack(self.history['video'])
-                        # cv2.imwrite('stacked_inp.jpg', stacked_inp)
-                        # cv2.imshow('stacked', stacked_inp)
-                        # cv2.waitKey(1)
+                    #     stacked_inp = np.hstack(self.history['video'])
+                    #     cv2.imwrite('stacked_inp.jpg', stacked_inp)
+                    #     cv2.imshow('stacked', stacked_inp)
+                    #     cv2.waitKey(1)
                     
                     self.execute_action()
                 else:
@@ -119,9 +119,12 @@ class RobotNode:
         video = video[::choose_every]
         audio = self.history['audio'].copy()
 
-        # if save:
-        #     stacked = np.hstack(video)
-        #     cv2.imwrite('stacked.jpg', stacked)
+        if save:
+            stacked = np.hstack(video)
+            # cv2.imwrite('stacked.jpg', stacked)
+            stacked = cv2.resize(stacked, (640, 480))
+            cv2.imshow('stacked', stacked)
+            cv2.waitKey(1)
 
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]
@@ -196,7 +199,7 @@ class RobotNode:
             r.end_of_arm.move_by('wrist_roll', movement_resolution[action_idx])
         elif action_idx in [6, 7]:
             r.lift.move_by(movement_resolution[action_idx])
-        r.push_command()
-        # time.sleep(1)
+        if action_idx != 10:
+            r.push_command()
 
         return True

@@ -70,6 +70,7 @@ def main(config_path):
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer, step_size=config['period'], gamma=config['gamma']
     )
+    
     # save config
     # exp_dir = save_config(config)
 
