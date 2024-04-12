@@ -47,7 +47,7 @@ class ImitationEpisode(Dataset):
         # self.crop_percent = config['crop_percent']
         self.action_dim = config['action_dim']
         self.stack_past_actions = config['stack_past_actions']
-        self.stack_future_actions = config['stack_future_actions']
+        self.output_model = config['output_model']
         self.stack_future_actions_dim = config['stack_future_actions_dim']
         self.dataset_root = config['dataset_root']
         self.norm_audio = config['norm_audio']
@@ -288,7 +288,7 @@ class ImitationEpisode(Dataset):
         frame_idx = np.arange(idx, idx + self.stack_future_actions_dim)
         frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1
 
-        if self.stack_future_actions:
+        if self.output_model != "aux":
             if self.stack_past_actions:
                 xyzgt = torch.cat(
                     [
@@ -312,7 +312,7 @@ class ImitationEpisode(Dataset):
                             dim=0,
                         )
 
-        if not self.stack_past_actions and not self.stack_future_actions:
+        if not self.stack_past_actions and self.output_model == "aux":
             xyzgt = torch.Tensor(self.actions[idx])
         
         # print(cam_gripper_framestack.shape, mel.shape, xyzgt.shape)

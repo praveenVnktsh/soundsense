@@ -31,7 +31,20 @@ class ImiEngine(LightningModule):
     def compute_loss(self, xyz_gt, xyz_pred):
         # print("xyz_pred", xyz_pred.size())
         # print("xyz_gt", xyz_gt.size())
-        loss = self.loss_cce(xyz_pred, xyz_gt.view(xyz_gt.size(0), -1))
+        # loss = self.loss_cce(xyz_pred, xyz_gt.view(xyz_gt.size(0), -1))
+        if self.config["output_model"] == "seq_pred":
+            pred_copy = xyz_pred.clone().view(xyz_gt.size(0), xyz_gt.size(1), -1)
+            loss = 0
+            for i in range(xyz_gt.size(1)):
+                loss += self.loss_cce(pred_copy[:, i, :], xyz_gt[:, i, :])
+            loss /= xyz_gt.size(1)
+        elif self.config["output_model"] == "layered":
+            loss = 0
+            for i in range(xyz_gt.size(1)):
+                loss += self.loss_cce(xyz_pred[:, i, :], xyz_gt[:, i, :])
+            loss /= xyz_gt.size(1)
+        elif self.config["output_model"] == "aux":
+            loss = self.loss_cce(xyz_pred, xyz_gt)
         # if self.config["stack_future_actions"]:
         #     loss = torch.mean(loss)
         return loss
