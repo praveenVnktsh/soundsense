@@ -38,7 +38,7 @@ class ImiEngine(LightningModule):
             for i in range(xyz_gt.size(1)):
                 loss += self.loss_cce(pred_copy[:, i, :], xyz_gt[:, i, :])
             loss /= xyz_gt.size(1)
-        elif self.config["output_model"] == "layered":
+        elif self.config["output_model"] == "layered" or self.config["output_model"] == "multi_head":
             loss = 0
             for i in range(xyz_gt.size(1)):
                 loss += self.loss_cce(xyz_pred[:, i, :], xyz_gt[:, i, :])

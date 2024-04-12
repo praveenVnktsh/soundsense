@@ -26,7 +26,7 @@ aux_multiplier: 1.0
 conv_bottleneck: 128
 modalities: vg #vg or vg_ag
 stack_past_actions: False
-output_model: "layered" # ["seq_pred", "layered", "aux"]
+output_model: "multi_head" # ["seq_pred", "layered", "multi_head", "aux"]
 stack_future_actions_dim: 6
 
 
@@ -34,7 +34,7 @@ stack_future_actions_dim: 6
 num_workers: 16
 batch_size: 32
 
-lr: 0.0001
+lr: 0.00005
 gamma: 0.9
 period: 3
 epochs: 200
