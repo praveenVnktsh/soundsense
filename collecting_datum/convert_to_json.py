@@ -16,7 +16,7 @@ mapping = {
     'l': 9,
 }
 # for folder
-og_root = '/home/hello-robot/soundsense/soundsense/stretch/data_two_cups'
+og_root = '/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups'
 for run_id in os.listdir(og_root):
     root = f'{og_root}/{run_id}'
     print("Processing ", root)

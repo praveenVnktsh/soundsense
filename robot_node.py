@@ -50,7 +50,9 @@ class RobotNode:
         
     
     def callback(self, data):
-        audio = np.frombuffer(data.data, dtype=np.uint8).tolist()
+        audio = np.frombuffer(data.data, dtype=np.int16).copy().astype(np.float64)
+        audio /= 32768
+        audio = audio.tolist()
         self.history['audio']+= (audio)
         if len(self.history['audio']) > self.audio_n_seconds * self.hz:
             self.history['audio'] = self.history['audio'][-self.audio_n_seconds * self.hz:]
@@ -111,12 +113,6 @@ class RobotNode:
                     if len(self.history['video']) > n_stack:
                         self.history['video'] = self.history['video'][-n_stack:]
 
-
-                    # if visualize:
-                    #     stacked_inp = np.hstack(self.history['video'])
-                    #     cv2.imwrite('stacked_inp.jpg', stacked_inp)
-                    #     cv2.imshow('stacked', stacked_inp)
-                    #     cv2.waitKey(1)
                     
                     self.execute_action()
                 else:
@@ -149,21 +145,19 @@ class RobotNode:
         choose_every = n_images // self.n_stack_images
 
         video = video[::choose_every]
-        audio = torch.tensor(self.history['audio']).float()
-        audio /= 255
-        audio -= 0.5
-
         
-        audio = audio.unsqueeze(0).unsqueeze(0)
         if self.use_audio:
-            # audio = torch.tensor(audio).float()
+            starttime = time.time()
+            audio = torch.tensor(self.history['audio']).float()
+            audio = audio.unsqueeze(0).unsqueeze(0)
             mel = self.mel(audio)
             mel = np.log(mel + 1)
             if self.norm_audio:
                 mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
                 mel -= mel.mean()
-            print(mel.min(), mel.max())
-
+            print("AUDIO_MEL", mel.min(), mel.max())
+            print("RAW_AUDIO", audio.min(), audio.max())
+            print("Time to process audio: ", time.time() - starttime)
 
         if save:
             stacked = np.hstack(video)
@@ -171,11 +165,12 @@ class RobotNode:
             print("IMSHOWING")
             stacked = cv2.resize(stacked, (0, 0), fx = 2, fy = 2)
             cv2.imshow('stacked', stacked)
+            cv2.waitKey(1)
             if self.use_audio:
                 import matplotlib.pyplot as plt
-                plt.ion()
-                plt.imshow(mel.squeeze().numpy())
-                plt.show()
+                # plt.ion()
+                # plt.imshow(mel.squeeze().numpy(), cmap = 'viridis',origin='lower',)
+                # plt.show()
                 # temp =  mel.numpy().squeeze().copy()
                 # temp -= temp.min()
                 # temp /= temp.max()
@@ -183,7 +178,7 @@ class RobotNode:
                 # temp = temp.astype(np.uint8)
                 # temp = cv2.resize(temp, (0, 0), fx = 3, fy = 3)
                 # cv2.imshow('mel', temp)
-            cv2.waitKey(1)
+            
             
 
         # cam_gripper_framestack,audio_clip_g
@@ -195,7 +190,7 @@ class RobotNode:
         
         return {
             'video' : video, # list of images
-            'audio' : audio, # audio buffer
+            'audio' : mel, # audio buffer
         }
 
     def execute_action(self):
@@ -204,7 +199,9 @@ class RobotNode:
         # action[0] = np.clip(action[0], -0.01, 0.01)
         r = self.r
         inputs = self.generate_inputs()
+        starttime = time.time()
         outputs = self.model(inputs) # 11 dimensional
+        print("Time to run model: ", time.time() - starttime)
         outputs = torch.nn.functional.softmax(outputs)
         # w - extend arm
         # s - retract arm

@@ -22,7 +22,7 @@ class Actor(torch.nn.Module):
         self.encoder_dim = config["encoder_dim"]
         self.use_mha = config["use_mha"]
         self.modalities = config["modalities"].split("_")
-        self.output_model = config["output_model"]
+        self.output_model = config["output_model"] if  'output_model' in config.keys() else 'aux'
     
         self.query = nn.Parameter(torch.randn(1, 1, self.layernorm_embed_shape))
         self.embed_dim = self.layernorm_embed_shape * len(self.modalities)
@@ -47,13 +47,19 @@ class Actor(torch.nn.Module):
             self.device = torch.device("cpu")
         self.action_dim = config["action_dim"]
         self.aux_mlp = nn.Linear(self.layernorm_embed_shape, self.action_dim) #6
-        self.seq_pred_mlp = nn.Linear(self.layernorm_embed_shape, config["stack_future_actions_dim"]*self.action_dim) 
-        self.layered_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.Tanh()).to(self.device)] + \
-            [nn.Sequential(nn.Linear(self.action_dim, self.action_dim), nn.Tanh()).to(self.device) for i in range(config["stack_future_actions_dim"])] 
-            # [nn.Linear(self.action_dim, self.action_dim).to(self.device)] # no activations after last layer
-        self.multi_head_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.ReLU()).to(self.device)] + \
-            [nn.Linear(self.action_dim, self.action_dim).to(self.device) for i in range(config["stack_future_actions_dim"])] 
+
+
+        if self.output_model == "seq_pred":
+            self.seq_pred_mlp = nn.Linear(self.layernorm_embed_shape, config["stack_future_actions_dim"]*self.action_dim) 
         
+        if self.output_model == "layered":
+            self.layered_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.Tanh()).to(self.device)] + \
+                [nn.Sequential(nn.Linear(self.action_dim, self.action_dim), nn.Tanh()).to(self.device) for i in range(config["stack_future_actions_dim"])] 
+                # [nn.Linear(self.action_dim, self.action_dim).to(self.device)] # no activations after last layer
+        if self.output_model == "multi_head":
+            self.multi_head_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.ReLU()).to(self.device)] + \
+                [nn.Linear(self.action_dim, self.action_dim).to(self.device) for i in range(config["stack_future_actions_dim"])] 
+            
 
     def forward(self, inputs):
         """

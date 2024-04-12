@@ -53,6 +53,7 @@ After collecting one data point, ensure that the audio recorded is correct (play
 
 ```shell
 roslaunch audio_capture capture.launch format:="wave"
-roslaunch audio_capture capture_wave.launch 
 ```
-Audio is mono audio, 16 bit in nature not 8 bit. (S16LE)
+Audio is of format - S16LE (signed 16 bit (int16) little endian)
+- Before running inference, run `pavucontrol` and ensure that the recording device is the stereo osmo action 3 camera.
+- Also ensure that the input device in settings is osmo action 3 camera. Output is internal headphones.

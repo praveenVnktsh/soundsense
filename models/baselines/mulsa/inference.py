@@ -51,7 +51,6 @@ class MULSAInference(pl.LightningModule):
         
         if self.use_audio:
             audio = inp["audio"]
-            audio = torch.tensor(audio).unsqueeze(0)
             x = video, audio
         else:
             x = video, None

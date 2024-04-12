@@ -5,7 +5,7 @@ from audio_common_msgs.msg import AudioDataStamped, AudioData
 from robot_node import RobotNode
 import yaml
 import torch
-# from robot_node_test_with_gt import RobotNode
+from robot_node_test_with_gt import RobotNode
 
 
 if __name__ == "__main__":
@@ -22,10 +22,11 @@ if __name__ == "__main__":
     # If using MULSA, change out to out[0] in inference.py line 99
     
     model_root = "/home/hello-robot/soundsense/soundsense/models/baselines/mulsa/trained_models/"
-    # model_root += "mulsa_cnn_unimodal_full_task04-07-12:35:14"
-    model_root += "mulsa_cnn_audio_full_task04-09-22:00:28"
+    model_root += "mulsa_cnn_unimodal_full_task04-07-12:35:14"
+    # model_root += "mulsa_mha_audio_full_task04-09-15:48:16"
     model_root += '/'
     model_name = 'last.ckpt'
+    # model_name = '04-09-15:48:16-v1.ckpt'
     print("Loading hparams from ", model_root + "hparams.yaml")
 
     

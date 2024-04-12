@@ -3,10 +3,10 @@ import glob
 import os
 from natsort import natsorted
 
-
-for run_id in natsorted(os.listdir('seventysix/data')):
+root_fold = '/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups'
+for run_id in natsorted(os.listdir(root_fold)):
     print("Processing ", run_id)
-    root = f'seventysix/data/{run_id}'
+    root = f'{root_fold}/{run_id}'
 
     imgs = sorted(glob.glob(f'{root}/video/*.png'))
     start_timestamp = os.path.basename(imgs[0]).split('.')[0]
