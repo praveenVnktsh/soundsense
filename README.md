@@ -47,4 +47,5 @@ terminal 3 - teleop_collector.py (control on this)
 
 ```shell
 roslaunch audio_capture capture.launch format:="wave"
+roslaunch audio_capture capture_wave.launch 
 ```

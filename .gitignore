@@ -20,3 +20,4 @@ baselines/playbyear/hydralogs/
 *.npy
 *.txt
 *.npy
+*.wav
