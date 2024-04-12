@@ -160,4 +160,4 @@ if __name__ == "__main__":
     print(len(train_set), len(val_set))
 
     for i, (data, target) in enumerate(val_loader):
-        gradcam(model, data[0], save_dir, i, config["stack_actions"])
+        gradcam(model, data[0], save_dir, i, config["output_past_actions"])
