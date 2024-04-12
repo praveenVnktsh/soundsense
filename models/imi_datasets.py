@@ -45,7 +45,10 @@ class ImitationEpisode(Dataset):
         self.resized_width_v = config['resized_width_v']
         # self.nocrop = not config['is_crop']
         # self.crop_percent = config['crop_percent']
-        self.stack_actions = config['stack_actions']
+        self.action_dim = config['action_dim']
+        self.stack_past_actions = config['stack_past_actions']
+        self.output_model = config['output_model']
+        self.stack_future_actions_dim = config['stack_future_actions_dim']
         self.dataset_root = config['dataset_root']
         self.norm_audio = config['norm_audio']
         
@@ -266,19 +269,50 @@ class ImitationEpisode(Dataset):
             # testing
             # sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
             # plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
+            # print("RESAMPLEd", audio_clip_g.min(), audio_clip_g.max(), audio_clip_g.mean(), audio_clip_g.std())
+            # print("AUDIO GRIPPER", self.audio_gripper.min(), self.audio_gripper.max(), self.audio_gripper.mean(), self.audio_gripper.std())
+            # exit()
             # plot the raw waveform
         else:
             mel = 0
  
-        if self.stack_actions:
+        if self.stack_past_actions:
             xyzgt = torch.stack(
-                [
-                    torch.Tensor(self.actions[i])
-                    for i in frame_idx
-                ],
-                dim=0,
-            )
-        else:
+                        [
+                            torch.Tensor(self.actions[i])
+                            for i in frame_idx
+                        ],
+                        dim=0,
+                    )
+        
+        frame_idx = np.arange(idx, idx + self.stack_future_actions_dim)
+        frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1
+
+        if self.output_model != "aux":
+            if self.stack_past_actions:
+                xyzgt = torch.cat(
+                    [
+                        xyzgt,
+                        torch.stack(
+                            [
+                                torch.Tensor(self.actions[i]) if i < self.episode_length else torch.Tensor([0]*(self.action_dim - 1) + [1])
+                                for i in frame_idx 
+                            ],
+                            dim=0,
+                        ),
+                    ],
+                    dim=0,
+                )
+            else:
+                xyzgt = torch.stack(
+                            [
+                                torch.Tensor(self.actions[i]) if i < self.episode_length else torch.Tensor([0]*(self.action_dim - 1) + [1])
+                                for i in frame_idx
+                            ],
+                            dim=0,
+                        )
+
+        if not self.stack_past_actions and self.output_model == "aux":
             xyzgt = torch.Tensor(self.actions[idx])
         
         # print(cam_gripper_framestack.shape, mel.shape, xyzgt.shape)
@@ -302,7 +336,9 @@ if __name__ == "__main__":
             'resized_width_v': 100,
             'is_crop': False,
             'crop_percent': 0.1,
-            'stack_actions': True,
+            'stack_past_actions': True,
+            'stack_future_actions': False,
+            'stack_future_actions_dim': 6,
             'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
             'num_stack': 6,
             'norm_audio' : True
