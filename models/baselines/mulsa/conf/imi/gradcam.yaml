@@ -31,9 +31,9 @@ use_mha: True
 aux_multiplier: 1.0
 conv_bottleneck: 128
 modalities: vg #vg or vg_ag
-stack_past_actions: False
+output_past_actions: False
 output_model: "layered" # ["seq_pred", "layered", "multi_head", "aux"]
-stack_future_actions_dim: 6
+output_future_actions_dim: 6
 
 # training params
 lr: 0.0001

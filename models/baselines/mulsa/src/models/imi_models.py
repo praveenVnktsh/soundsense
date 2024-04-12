@@ -47,12 +47,12 @@ class Actor(torch.nn.Module):
             self.device = torch.device("cpu")
         self.action_dim = config["action_dim"]
         self.aux_mlp = nn.Linear(self.layernorm_embed_shape, self.action_dim) #6
-        self.seq_pred_mlp = nn.Linear(self.layernorm_embed_shape, config["stack_future_actions_dim"]*self.action_dim) 
+        self.seq_pred_mlp = nn.Linear(self.layernorm_embed_shape, config["output_future_actions_dim"]*self.action_dim) 
         self.layered_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.Tanh()).to(self.device)] + \
-            [nn.Sequential(nn.Linear(self.action_dim, self.action_dim), nn.Tanh()).to(self.device) for i in range(config["stack_future_actions_dim"])] 
+            [nn.Sequential(nn.Linear(self.action_dim, self.action_dim), nn.Tanh()).to(self.device) for i in range(config["output_future_actions_dim"])] 
             # [nn.Linear(self.action_dim, self.action_dim).to(self.device)] # no activations after last layer
-        self.multi_head_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.ReLU()).to(self.device)] + \
-            [nn.Linear(self.action_dim, self.action_dim).to(self.device) for i in range(config["stack_future_actions_dim"])] 
+        self.multi_head_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim*3), nn.ReLU()).to(self.device)] + \
+            [nn.Linear(self.action_dim*3, self.action_dim).to(self.device) for i in range(config["output_future_actions_dim"])] 
         
 
     def forward(self, inputs):
@@ -112,7 +112,7 @@ class Actor(torch.nn.Module):
             for i in range(1, len(self.layered_mlps)):
                 out1 = self.layered_mlps[i](out1)
                 out = torch.cat([out, out1.clone()], dim=0) # [Linear(action_dim, action_dim), Tanh()] (except last layer)
-            out = out.view(-1, len(self.layered_mlps)-1, self.action_dim) # [batch, stack_future_actions_dim, action_dim]
+            out = out.view(-1, len(self.layered_mlps)-1, self.action_dim) # [batch, output_future_actions_dim, action_dim]
 
         elif self.output_model == "multi_head":
             out1 = self.multi_head_mlps[0](mlp_inp) # embed_dim, action_dim
@@ -120,7 +120,7 @@ class Actor(torch.nn.Module):
             for i in range(1, len(self.multi_head_mlps)):
                 out2 = self.multi_head_mlps[i](out1) # all heads output on same out1
                 out = torch.cat([out, out2.clone()], dim=0) # [Linear(action_dim, action_dim), ReLU()] (except last layer)
-            out = out.view(-1, len(self.multi_head_mlps)-1, self.action_dim) # [batch, stack_future_actions_dim, action_dim]
+            out = out.view(-1, len(self.multi_head_mlps)-1, self.action_dim) # [batch, output_future_actions_dim, action_dim]
             
         elif self.output_model == "aux":
             out = self.aux_mlp(mlp_inp)

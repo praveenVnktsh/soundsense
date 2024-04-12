@@ -5,7 +5,9 @@ batch_size: 32
 num_workers: 0
 
 # image 
-stack_actions: True
+output_past_actions: True
+output_future_actions: False
+output_future_actions_dim: 6
 fps: 10 #capture image fps
 num_stack: 6
 resized_height_v: 75
