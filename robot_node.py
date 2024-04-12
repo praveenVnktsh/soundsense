@@ -6,36 +6,52 @@ import cv2
 import yaml
 import rospy
 from audio_common_msgs.msg import AudioDataStamped, AudioData
-
+import torchaudio
+import soundfile as sf
 class RobotNode:
-    def __init__(self, config_path, model, is_unimodal = False):
+    def __init__(self, config_path, model, testing= False):
         self.r = stretch_body.robot.Robot()
         self.boot_robot()
+
+        self.testing = False
         
         with open(config_path) as info:
             params = yaml.load(info.read(), Loader=yaml.FullLoader)
 
-        self.image_shape = params['camera_inp_h_w']
-        self.bgr_to_rgb = params['bgr_to_rgb']
+        
+        
+        params['camera_id'] = '/dev/video6'
 
-        self.hz = params['audio_hz']
-        self.audio_n_seconds = params['audio_history_seconds']
+        self.image_shape = [params['resized_height_v'], params['resized_width_v']]
+
+        self.hz = params['resample_rate_audio']
+        self.audio_n_seconds = params['audio_len']
         cam = params['camera_id']
-        self.n_stack_images = params['camera_stack_images']
+        self.n_stack_images = params['num_stack']
+        self.norm_audio = params['norm_audio']
         self.history = {
             'audio': [],
             'video': [],
         }
-        if not is_unimodal:
+        self.use_audio = "ag" in params['modalities'].split("_")
+        if self.use_audio:
             audio_sub = rospy.Subscriber('/audio/audio', AudioData, self.callback)
             print("Waiting for audio data...")
             rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
+            self.mel = torchaudio.transforms.MelSpectrogram(
+                sample_rate=self.hz, 
+                n_fft=512, 
+                hop_length=int(self.hz * 0.01), 
+                n_mels=64
+            )
         self.cap  = cv2.VideoCapture(cam)
         self.model = model
+
+        
     
     def callback(self, data):
-        audio = np.frombuffer(data.data, dtype=np.uint8)
-        self.history['audio'].append(audio)
+        audio = np.frombuffer(data.data, dtype=np.uint8).tolist()
+        self.history['audio']+= (audio)
         if len(self.history['audio']) > self.audio_n_seconds * self.hz:
             self.history['audio'] = self.history['audio'][-self.audio_n_seconds * self.hz:]
 
@@ -68,8 +84,8 @@ class RobotNode:
         h, w = self.image_shape 
         ret, frame = self.cap.read()
         frame = cv2.resize(frame, (h, w))
-        if self.bgr_to_rgb:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # if self.bgr_to_rgb:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         if not ret:
             return None
         return frame
@@ -108,7 +124,23 @@ class RobotNode:
                     is_run = False
 
         print("Ending run loop")
-
+    def clip_resample(self, audio, audio_start, audio_end):
+        left_pad, right_pad = torch.Tensor([]), torch.Tensor([])
+        # print("au_size", audio.size())
+        if audio_start < 0:
+            left_pad = torch.zeros((audio.shape[0], -audio_start))
+            audio_start = 0
+        if audio_end >= audio.size(-1):
+            right_pad = torch.zeros((audio.shape[0], audio_end - audio.size(-1)))
+            audio_end = audio.size(-1)
+        audio_clip = torch.cat(
+            [left_pad, audio[:, audio_start:audio_end], right_pad], dim=1
+        )
+        
+        # audio_clip = torchaudio.functional.resample(audio_clip, self.hz, self.resample_rate_audio)
+        # print("Inside clip_resample output shape", audio_clip.shape)
+        
+        return audio_clip
     def generate_inputs(self, save = True):
         
         video = self.history['video'].copy() # subsample n_frames of interest
@@ -117,14 +149,42 @@ class RobotNode:
         choose_every = n_images // self.n_stack_images
 
         video = video[::choose_every]
-        audio = self.history['audio'].copy()
+        audio = torch.tensor(self.history['audio']).float()
+        audio /= 255
+        audio -= 0.5
+
+        
+        audio = audio.unsqueeze(0).unsqueeze(0)
+        if self.use_audio:
+            # audio = torch.tensor(audio).float()
+            mel = self.mel(audio)
+            mel = np.log(mel + 1)
+            if self.norm_audio:
+                mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
+                mel -= mel.mean()
+            print(mel.min(), mel.max())
+
 
         if save:
             stacked = np.hstack(video)
             # cv2.imwrite('stacked.jpg', stacked)
-            stacked = cv2.resize(stacked, (640, 480))
+            print("IMSHOWING")
+            stacked = cv2.resize(stacked, (0, 0), fx = 2, fy = 2)
             cv2.imshow('stacked', stacked)
+            if self.use_audio:
+                import matplotlib.pyplot as plt
+                plt.ion()
+                plt.imshow(mel.squeeze().numpy())
+                plt.show()
+                # temp =  mel.numpy().squeeze().copy()
+                # temp -= temp.min()
+                # temp /= temp.max()
+                # temp *= 255
+                # temp = temp.astype(np.uint8)
+                # temp = cv2.resize(temp, (0, 0), fx = 3, fy = 3)
+                # cv2.imshow('mel', temp)
             cv2.waitKey(1)
+            
 
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]
@@ -199,7 +259,7 @@ class RobotNode:
             r.end_of_arm.move_by('wrist_roll', movement_resolution[action_idx])
         elif action_idx in [6, 7]:
             r.lift.move_by(movement_resolution[action_idx])
-        if action_idx != 10:
+        if action_idx != 10 and not self.testing:
             r.push_command()
 
         return True

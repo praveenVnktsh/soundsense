@@ -14,15 +14,13 @@ import yaml
 import configargparse
 import os
 class MULSAInference(pl.LightningModule):
-    def __init__(self):
+    def __init__(self, config_path):
         super().__init__()
-        config_path = os.path.expanduser('/home/hello-robot/soundsense/soundsense/config/test_cnn.yaml')
-        with open(config_path) as f:
-            self.config = yaml.load(f, Loader=yaml.FullLoader)
-            config = self.config
+        with open(config_path) as info:
+            self.config = yaml.load(info.read(), Loader=yaml.FullLoader) 
         v_encoder = make_vision_encoder(self.config['encoder_dim'])
         a_encoder = make_audio_encoder(self.config['encoder_dim'] * self.config['num_stack'], self.config['norm_audio'])
-
+        self.use_audio = "ag" in self.config["modalities"].split("_")
         self.actor = Actor(v_encoder, a_encoder, self.config)
 
         self.transform_image = transforms.Compose([
@@ -51,7 +49,7 @@ class MULSAInference(pl.LightningModule):
         video = torch.stack([self.transform_image(img) for img in video], dim=0)
         video = video.unsqueeze(0)
         
-        if "ag" in self.config["modalities"].split("_"):
+        if self.use_audio:
             audio = inp["audio"]
             audio = torch.tensor(audio).unsqueeze(0)
             x = video, audio

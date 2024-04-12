@@ -19,6 +19,8 @@ import hello_helpers.hello_misc as hm
 import cv2
 import os
 
+
+Data_PATH = '../stretch/data/data_two_cups'
 keypress = None
 def on_press(key):
     global keypress
@@ -54,8 +56,8 @@ class GetKeyboardCommands:
             on_press=on_press,
             on_release=on_release)
         listener.start()
-        os.makedirs(f'data/{run_id}/', exist_ok=True)
-        self.file = open(f'data/{run_id}/keyboard_teleop.txt', 'w')
+        os.makedirs(Data_PATH + f'/{run_id}/', exist_ok=True)
+        self.file = open(Data_PATH + f'/{run_id}/keyboard_teleop.txt', 'w')
         # camera_idx = 
         # self.cap = cv2.VideoCapture(f'v4l2src device=/dev/video7 io-mode=2 ! image/jpeg, width=(int)1920, height=(int)1080 !  appsink', cv2.CAP_GSTREAMER)
         self.cap =cv2.VideoCapture('/dev/video6', cv2.CAP_V4L2)
@@ -108,7 +110,7 @@ class GetKeyboardCommands:
         ret, frame = self.cap.read()
         frame = cv2.resize(frame, (0, 0), fx = 0.5, fy = 0.5)
 
-        pathFolder = 'data/' + str(run_id) + '/' + 'video/' + str(time) + '.png'
+        pathFolder = Data_PATH + '/' + str(run_id) + '/' + 'video/' + str(time) + '.png'
         # print(time, c, pathFolder)
         cv2.imwrite(pathFolder, frame)
         
@@ -453,7 +455,7 @@ if __name__ == '__main__':
     #     os.rmdir(f'data/{run_id}/')
     # except:
     #     print("Directory does not exist")
-    os.makedirs(f'data/{run_id}/video', exist_ok=True)
+    os.makedirs(Data_PATH + f'/{run_id}/video', exist_ok=True)
     
     # commands = [f'python3 grab_audio.py {run_id}']
     # procs = [ Popen(i, shell = True) for i in commands ]

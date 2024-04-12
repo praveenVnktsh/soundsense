@@ -3,6 +3,8 @@ import rospy
 import time
 from audio_common_msgs.msg import AudioDataStamped, AudioData
 from robot_node import RobotNode
+import yaml
+import torch
 # from robot_node_test_with_gt import RobotNode
 
 
@@ -13,22 +15,40 @@ if __name__ == "__main__":
     # JUST IMPORT THE CORRECT MODEL FROM HERE BRO!
 
     rospy.init_node("test_model")
-    is_unimodal = True # flag to enable audio capture and recording.
     
     # action_path = '/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/3/actions.json'
     # model = LitModel(action_path = action_path)
     # model.eval()
     # If using MULSA, change out to out[0] in inference.py line 99
     
-    model_path = "/home/hello-robot/soundsense/soundsense/models/baselines/mulsa/trained_models/mulsa_cnn_unimodal_full_task04-07-12:35:14/last.ckpt"
-    model = MULSAInference.load_from_checkpoint(model_path)
+    model_root = "/home/hello-robot/soundsense/soundsense/models/baselines/mulsa/trained_models/"
+    # model_root += "mulsa_cnn_unimodal_full_task04-07-12:35:14"
+    model_root += "mulsa_cnn_audio_full_task04-09-22:00:28"
+    model_root += '/'
+    model_name = 'last.ckpt'
+    print("Loading hparams from ", model_root + "hparams.yaml")
+
+    
+    model = MULSAInference(
+        config_path = model_root + "hparams.yaml",
+    )
+
+    model.load_state_dict(
+        torch.load(
+            model_root + model_name,
+            map_location=torch.device("cpu"),
+        )['state_dict']
+    )
+    # model.load_from_checkpoint(
+    #     model_root + model_name,
+    # )
+
     model.eval()
 
     robot = RobotNode(
-        config_path='config/test_cnn.yaml',
-        model= model, 
-        is_unimodal = is_unimodal,
-
+        config_path = model_root + "hparams.yaml",
+        model = model, 
+        testing = True
     )
 
     robot.run_loop(True)

@@ -19,7 +19,6 @@ class Actor(torch.nn.Module):
 
         self.layernorm_embed_shape = config["encoder_dim"] * config["num_stack"]
         print("Layernorm embed shape:", self.layernorm_embed_shape)
-        print("embed_dim:", self.layernorm_embed_shape)
         self.encoder_dim = config["encoder_dim"]
         self.use_mha = config["use_mha"]
         self.modalities = config["modalities"].split("_")
@@ -27,6 +26,7 @@ class Actor(torch.nn.Module):
     
         self.query = nn.Parameter(torch.randn(1, 1, self.layernorm_embed_shape))
         self.embed_dim = self.layernorm_embed_shape * len(self.modalities)
+        print("embed_dim:", self.layernorm_embed_shape )
         self.layernorm = nn.LayerNorm(self.layernorm_embed_shape)
         self.mha = MultiheadAttention(self.layernorm_embed_shape, config["num_heads"])
 
