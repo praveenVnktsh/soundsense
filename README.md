@@ -49,9 +49,10 @@ After collecting one data point, ensure that the audio recorded is correct (play
 
 
 
-### README
+### Audio README
 
 ```shell
 roslaunch audio_capture capture.launch format:="wave"
 roslaunch audio_capture capture_wave.launch 
 ```
+Audio is mono audio, 16 bit in nature not 8 bit. (S16LE)
