@@ -23,6 +23,9 @@ modalities: vg
 output_past_actions: False
 output_future_actions: False
 output_future_actions_dim: 6
+input_past_actions: False
+input_past_actions_dim: 6
+history_encoder_dim: 32
 num_stack: 6
 
 # training params

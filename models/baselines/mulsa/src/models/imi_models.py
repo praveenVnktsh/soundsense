@@ -23,6 +23,8 @@ class Actor(torch.nn.Module):
         self.use_mha = config["use_mha"]
         self.modalities = config["modalities"].split("_")
         self.output_model = config["output_model"] if  'output_model' in config.keys() else 'aux'
+        self.input_past_actions = config["input_past_actions"]
+        self.input_past_actions_dim = config["input_past_actions_dim"]
     
         self.query = nn.Parameter(torch.randn(1, 1, self.layernorm_embed_shape))
         self.embed_dim = self.layernorm_embed_shape * len(self.modalities)
@@ -59,7 +61,11 @@ class Actor(torch.nn.Module):
         if self.output_model == "multi_head":
             self.multi_head_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.ReLU()).to(self.device)] + \
                 [nn.Linear(self.action_dim, self.action_dim).to(self.device) for i in range(config["stack_future_actions_dim"])] 
-            
+        
+        if self.input_past_actions:  
+            self.history_encoder_dim = config["history_encoder_dim"]
+            self.history_mlp = [nn.Sequential(nn.Linear(self.input_past_actions_dim*self.action_dim, self.history_encoder_dim), nn.Tanh()).to(self.device)] + \
+                [nn.Sequential(nn.Linear(self.layernorm_embed_shape+self.history_encoder_dim, self.layernorm_embed_shape), nn.Tanh()).to(self.device)]
 
     def forward(self, inputs):
         """
@@ -70,7 +76,7 @@ class Actor(torch.nn.Module):
 
         """
 
-        vg_inp, audio_g, = inputs
+        vg_inp, audio_g, history = inputs
         embeds = []
 
         if "vg" in self.modalities:
@@ -88,9 +94,10 @@ class Actor(torch.nn.Module):
             ag_embeds = self.a_encoder(audio_g)
             ag_embeds = ag_embeds.view(-1, self.layernorm_embed_shape)
             embeds.append(ag_embeds)
-
+        
         if self.use_mha:
             mlp_inp = torch.stack(embeds, dim=0)  # [2, batch, D]
+            print("mlp_inp", mlp_inp.shape)
             # batch first=False, (L, N, E)
             # query = self.query.repeat(1, batch, 1) # [1, 1, D] -> [1, batch, D]
             # change back to 3*3
@@ -108,6 +115,15 @@ class Actor(torch.nn.Module):
             mlp_inp = self.bottleneck(mlp_inp)
             weights = None
 
+
+        if self.input_past_actions:
+            # print("history", history.shape)
+            history = history.view(-1, self.input_past_actions_dim*self.action_dim)
+            history = self.history_mlp[0](history)
+            mlp_inp = torch.concat([mlp_inp, history], dim=-1)
+            mlp_input = self.history_mlp[1](mlp_inp)
+            print("mlp_inp", mlp_inp.shape)
+
         # action_logits = self.mlp(mlp_inp)
         if self.output_model == "seq_pred":
             out = self.seq_pred_mlp(mlp_inp)
@@ -118,7 +134,7 @@ class Actor(torch.nn.Module):
             for i in range(1, len(self.layered_mlps)):
                 out1 = self.layered_mlps[i](out1)
                 out = torch.cat([out, out1.clone()], dim=0) # [Linear(action_dim, action_dim), Tanh()] (except last layer)
-            out = out.view(-1, len(self.layered_mlps)-1, self.action_dim) # [batch, output_future_actions_dim, action_dim]
+            out = out.view(-1, len(self.layered_mlps)-1, self.action_dim) # [batch, stack_future_actions_dim, action_dim]
 
         elif self.output_model == "multi_head":
             out1 = self.multi_head_mlps[0](mlp_inp) # embed_dim, action_dim
@@ -126,7 +142,7 @@ class Actor(torch.nn.Module):
             for i in range(1, len(self.multi_head_mlps)):
                 out2 = self.multi_head_mlps[i](out1) # all heads output on same out1
                 out = torch.cat([out, out2.clone()], dim=0) # [Linear(action_dim, action_dim), ReLU()] (except last layer)
-            out = out.view(-1, len(self.multi_head_mlps)-1, self.action_dim) # [batch, output_future_actions_dim, action_dim]
+            out = out.view(-1, len(self.multi_head_mlps)-1, self.action_dim) # [batch, stack_future_actions_dim, action_dim]
             
         elif self.output_model == "aux":
             out = self.aux_mlp(mlp_inp)

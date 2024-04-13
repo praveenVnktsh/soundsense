@@ -46,6 +46,7 @@ class ImitationEpisode(Dataset):
         # self.nocrop = not config['is_crop']
         # self.crop_percent = config['crop_percent']
         self.action_dim = config['action_dim']
+        self.input_past_actions = config['input_past_actions']
         self.output_past_actions = config['output_past_actions']
         self.output_model = config['output_model']
         self.output_future_actions_dim = config['output_future_actions_dim']
@@ -234,6 +235,17 @@ class ImitationEpisode(Dataset):
         else:
             cam_gripper_framestack = 0
 
+        if self.input_past_actions:
+            history = torch.stack(
+                [
+                    torch.Tensor(self.actions[i])
+                    for i in frame_idx
+                ],
+                dim=0,
+            )
+        else:
+            history = 0
+
         # Random cropping
         # if self.train:
         #     img = self.transform_cam(
@@ -318,7 +330,7 @@ class ImitationEpisode(Dataset):
         # print(cam_gripper_framestack.shape, mel.shape, xyzgt.shape)
         return (
             (cam_gripper_framestack,
-            mel),
+            mel, history),
             xyzgt,
         )
     

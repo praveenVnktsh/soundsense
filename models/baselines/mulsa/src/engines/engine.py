@@ -45,7 +45,7 @@ class ImiEngine(LightningModule):
             loss /= xyz_gt.size(1)
         elif self.config["output_model"] == "aux":
             loss = self.loss_cce(xyz_pred, xyz_gt)
-        # if self.config["output_future_actions"]:
+        # if self.config["stack_future_actions"]:
         #     loss = torch.mean(loss)
         return loss
 
