@@ -23,8 +23,7 @@ class Actor(torch.nn.Module):
         self.use_mha = config["use_mha"]
         self.modalities = config["modalities"].split("_")
         self.output_model = config["output_model"] if  'output_model' in config.keys() else 'aux'
-        self.input_past_actions = config["input_past_actions"]
-        self.input_past_actions_dim = config["input_past_actions_dim"]
+        self.input_past_actions = config["input_past_actions"] if 'input_past_actions' in config.keys() else False
     
         self.query = nn.Parameter(torch.randn(1, 1, self.layernorm_embed_shape))
         self.embed_dim = self.layernorm_embed_shape * len(self.modalities)
@@ -63,6 +62,7 @@ class Actor(torch.nn.Module):
                 [nn.Linear(self.action_dim, self.action_dim).to(self.device) for i in range(config["stack_future_actions_dim"])] 
         
         if self.input_past_actions:  
+            self.input_past_actions_dim = config["input_past_actions_dim"]
             self.history_encoder_dim = config["history_encoder_dim"]
             self.history_mlp = [nn.Sequential(nn.Linear(self.input_past_actions_dim*self.action_dim, self.history_encoder_dim), nn.Tanh()).to(self.device)] + \
                 [nn.Sequential(nn.Linear(self.layernorm_embed_shape+self.history_encoder_dim, self.layernorm_embed_shape), nn.Tanh()).to(self.device)]
@@ -75,8 +75,11 @@ class Actor(torch.nn.Module):
             a_inp: [batch, 1, T]
 
         """
-
-        vg_inp, audio_g, history = inputs
+        if len(inputs) == 3:
+            vg_inp, audio_g, history = inputs
+        else:
+            vg_inp, audio_g = inputs
+            history = None
         embeds = []
 
         if "vg" in self.modalities:
@@ -97,7 +100,6 @@ class Actor(torch.nn.Module):
         
         if self.use_mha:
             mlp_inp = torch.stack(embeds, dim=0)  # [2, batch, D]
-            print("mlp_inp", mlp_inp.shape)
             # batch first=False, (L, N, E)
             # query = self.query.repeat(1, batch, 1) # [1, 1, D] -> [1, batch, D]
             # change back to 3*3

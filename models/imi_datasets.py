@@ -269,14 +269,12 @@ class ImitationEpisode(Dataset):
             audio_clip_g = self.clip_resample(
                 self.audio_gripper, audio_start, audio_end
             ).float()
+            eps = 1e-8
             mel = self.mel(audio_clip_g)
-            mel = np.log(mel + 1)
+            mel = np.log(mel + eps)
             if self.norm_audio:
-                mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
-                mel -= mel.mean()
-                
-
-                # print("mel", mel.min(), mel.max(), mel.mean(), mel.std())
+                mel /= mel.sum(dim=-2, keepdim=True)
+                # print("mel", mel.shape, mel.min(), mel.max(), mel.mean(), mel.std())
             
             # testing
             # sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
@@ -290,12 +288,12 @@ class ImitationEpisode(Dataset):
  
         if self.stack_past_actions:
             xyzgt = torch.stack(
-                        [
-                            torch.Tensor(self.actions[i])
-                            for i in frame_idx
-                        ],
-                        dim=0,
-                    )
+                [
+                    torch.Tensor(self.actions[i])
+                    for i in frame_idx
+                ],
+                dim=0,
+            )
         
         frame_idx = np.arange(idx, idx + self.stack_future_actions_dim)
         frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1

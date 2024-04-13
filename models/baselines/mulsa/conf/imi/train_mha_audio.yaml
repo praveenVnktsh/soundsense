@@ -13,7 +13,7 @@ audio_len: 3 #audio length in seconds
 
 # dataset
 dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data'
-train_val_split: 0.8
+train_val_split: 0.9
 
 # model params
 encoder_dim: 256
