@@ -47,9 +47,9 @@ class ImitationEpisode(Dataset):
         # self.crop_percent = config['crop_percent']
         self.action_dim = config['action_dim']
         self.input_past_actions = config['input_past_actions']
-        self.output_past_actions = config['output_past_actions']
+        self.stack_past_actions = config['stack_past_actions']
         self.output_model = config['output_model']
-        self.output_future_actions_dim = config['output_future_actions_dim']
+        self.stack_future_actions_dim = config['stack_future_actions_dim']
         self.dataset_root = config['dataset_root']
         self.norm_audio = config['norm_audio']
         
@@ -288,7 +288,7 @@ class ImitationEpisode(Dataset):
         else:
             mel = 0
  
-        if self.output_past_actions:
+        if self.stack_past_actions:
             xyzgt = torch.stack(
                         [
                             torch.Tensor(self.actions[i])
@@ -297,11 +297,11 @@ class ImitationEpisode(Dataset):
                         dim=0,
                     )
         
-        frame_idx = np.arange(idx, idx + self.output_future_actions_dim)
+        frame_idx = np.arange(idx, idx + self.stack_future_actions_dim)
         frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1
 
         if self.output_model != "aux":
-            if self.output_past_actions:
+            if self.stack_past_actions:
                 xyzgt = torch.cat(
                     [
                         xyzgt,
@@ -324,7 +324,7 @@ class ImitationEpisode(Dataset):
                             dim=0,
                         )
 
-        if not self.output_past_actions and self.output_model == "aux":
+        if not self.stack_past_actions and self.output_model == "aux":
             xyzgt = torch.Tensor(self.actions[idx])
         
         # print(cam_gripper_framestack.shape, mel.shape, xyzgt.shape)
@@ -348,9 +348,12 @@ if __name__ == "__main__":
             'resized_width_v': 100,
             'is_crop': False,
             'crop_percent': 0.1,
-            'output_past_actions': True,
-            'output_future_actions': False,
-            'output_future_actions_dim': 6,
+            'stack_past_actions': True,
+            'stack_future_actions': False,
+            'stack_future_actions_dim': 6,
+            'input_past_actions': False,
+            'input_past_actions_dim': 6,
+            'history_encoder_dim': 32,
             'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
             'num_stack': 6,
             'norm_audio' : True

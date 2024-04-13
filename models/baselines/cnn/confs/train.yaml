@@ -20,9 +20,9 @@ dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/hundred/data'
 train_val_split: 0.8
 
 modalities: vg
-output_past_actions: False
-output_future_actions: False
-output_future_actions_dim: 6
+stack_past_actions: False
+stack_future_actions: False
+stack_future_actions_dim: 6
 input_past_actions: False
 input_past_actions_dim: 6
 history_encoder_dim: 32

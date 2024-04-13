@@ -121,8 +121,8 @@ class Actor(torch.nn.Module):
             history = history.view(-1, self.input_past_actions_dim*self.action_dim)
             history = self.history_mlp[0](history)
             mlp_inp = torch.concat([mlp_inp, history], dim=-1)
-            mlp_input = self.history_mlp[1](mlp_inp)
-            print("mlp_inp", mlp_inp.shape)
+            mlp_inp = self.history_mlp[1](mlp_inp)
+            # print("mlp_inp", mlp_inp.shape)
 
         # action_logits = self.mlp(mlp_inp)
         if self.output_model == "seq_pred":
