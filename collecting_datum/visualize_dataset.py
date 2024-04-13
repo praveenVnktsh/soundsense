@@ -7,19 +7,20 @@ import time
 from playsound import playsound
 # def alert():
 #     threading.Thread(target=playsound, args=('/home/hello-robot/soundsense/soundsense/stretch/data/0/1711051394806730.wav',), daemon=True).start()
-
-with open('data/0/keyboard_teleop.json', 'r') as f:
+run_id = '17'
+root_fold = '/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/' + run_id
+with open(f'{root_fold}/actions.json', 'r') as f:
     data = json.load(f)
 
 # https://drive.google.com/file/d/1WToAxRFNkrsGaALi2A5Fp9ZkiIL9N56Y/view?usp=sharing
-paths = glob.glob('data/0/video/*.png')
+paths = glob.glob(f'{root_fold}/video/*.png')
 print()
 print(len(data), len(paths))
 
 col = 255
 # alert()
 starttime = time.time()
-for i, path in enumerate(sorted(glob.glob('data/0/video/*.png'))):
+for i, path in enumerate(sorted(glob.glob(f'{root_fold}/video/*.png'))):
     
     img = cv2.imread(path)
     

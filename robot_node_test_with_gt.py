@@ -31,9 +31,10 @@ class RobotNode:
             'audio': [0] * self.hz * self.audio_n_seconds,
             'video': [],
         }
+        run_id = '19'
         if not is_unimodal:
-            data = sf.read('/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/17/processed_audio.wav')[0]
-            self.total_audio = data[::3]
+            data = sf.read(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/processed_audio.wav')[0]
+            self.total_audio = torchaudio.functional.resample(torch.tensor(data), 48000, 16000).numpy()
             self.mel = torchaudio.transforms.MelSpectrogram(
                 sample_rate=self.hz, 
                 n_fft=512, 
@@ -42,7 +43,7 @@ class RobotNode:
             )
         self.idx = 0
         self.model = model
-        self.images = sorted(glob.glob('/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/17/video/*.png'))
+        self.images = sorted(glob.glob(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/video/*.png'))
     
     def clip_resample(self, audio, audio_start, audio_end):
         left_pad, right_pad = torch.Tensor([]), torch.Tensor([])
@@ -145,7 +146,7 @@ class RobotNode:
         inputs = self.generate_inputs()
         # with torch.no_grad():
         outputs = self.model(inputs).squeeze() # 11 dimensional
-        outputs = torch.nn.functional.softmax(outputs)
+        outputs = torch.nn.functional.softmax(outputs, dim = 0)
         mapping = {
             'w': 0, 
             's': 1,
@@ -174,14 +175,16 @@ class RobotNode:
         mel = None
         if self.use_audio:
             audio = self.history['audio'].copy()
-            audio = torch.tensor(self.history['audio']).float()
+            audio = torch.tensor(audio).float()
             audio = audio.unsqueeze(0).unsqueeze(0)
-            
             mel = self.mel(audio)
-            mel = np.log(mel + 1)
+            eps = 1e-8
+            mel = np.log(mel + eps)
+            
+            print((audio).numel() / self.hz)
+            print(audio.max(), audio.min(), audio.mean(), mel.max(), mel.min(), mel.mean())
             if self.norm_audio:
-                mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
-                mel -= mel.mean()
+                mel /= mel.sum(dim = -2, keepdim = True)
 
         if save:
             stacked = np.hstack(video)
@@ -194,12 +197,19 @@ class RobotNode:
             if self.use_audio:
                 import matplotlib.pyplot as plt
                 temp = mel.squeeze().numpy()
-                temp -= temp.min()
-                temp /= temp.max()
+                temp -= -15
+                temp /= 30
                 temp *= 255
                 temp = temp.astype(np.uint8)
                 temp = cv2.resize(temp, (0, 0), fx = 3, fy = 3)
                 temp = cv2.flip(temp, 0)
+                plt.ion()
+                plt.cla()
+                t = np.linspace(0, (audio.numel()) / self.hz, audio.numel())
+                plt.plot(t, audio.numpy().squeeze(), color='b')
+                plt.ylim(-1, 1)
+                plt.show()
+
                 cv2.imshow('mel', temp)
                 if cv2.waitKey(1) == ord('q'):
                     exit()

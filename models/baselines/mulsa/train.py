@@ -87,8 +87,7 @@ if __name__ == "__main__":
         print("Usage: python train.py <config_path>")
         exit(0)
 
-    config_path = sys.argv[1]    
-
+    config_path = sys.argv[1]
 
     print("CONFIG PATH: ", config_path)
     main(config_path = config_path)
