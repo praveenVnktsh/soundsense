@@ -28,13 +28,13 @@ class ImitationEpisode(Dataset):
         # self.logs = pd.read_csv(log_file)
         self.run_id = run_id
         self.sample_rate_audio = 48000 ##TODO
-        self.mel = torchaudio.transforms.MelSpectrogram(
-            sample_rate=self.sample_rate_audio,
-            n_fft=int(self.sample_rate_audio * 0.025),
-            hop_length=int(self.sample_rate_audio * 0.01),
-            n_mels=64,
-            center=False,
-        )
+        # self.mel = torchaudio.transforms.MelSpectrogram(
+        #     sample_rate=self.sample_rate_audio,
+        #     n_fft=int(self.sample_rate_audio * 0.025),
+        #     hop_length=int(self.sample_rate_audio * 0.01),
+        #     n_mels=64,
+        #     center=False, # why?
+        # )
         
         self.fps = config["fps"]
         self.audio_len = config['audio_len']
@@ -46,10 +46,12 @@ class ImitationEpisode(Dataset):
         # self.nocrop = not config['is_crop']
         # self.crop_percent = config['crop_percent']
         self.action_dim = config['action_dim']
-        self.input_past_actions = config['input_past_actions']
-        self.stack_past_actions = config['stack_past_actions']
-        self.output_model = config['output_model']
-        self.stack_future_actions_dim = config['stack_future_actions_dim']
+        
+        # self.input_past_actions = config['input_past_actions']
+        # self.stack_past_actions = config['stack_past_actions']
+        # self.stack_future_actions_dim = config['stack_future_actions_dim']
+        # self.output_model = config['output_model']
+
         self.dataset_root = config['dataset_root']
         self.norm_audio = config['norm_audio']
         
@@ -190,6 +192,7 @@ class ImitationEpisode(Dataset):
             print("Mismatch", len(actions) - len(image_paths), self.run_id)
             exit()
             
+        actions = torch.Tensor(actions)
         return (
             actions,
             audio_gripper,
@@ -235,16 +238,16 @@ class ImitationEpisode(Dataset):
         else:
             cam_gripper_framestack = 0
 
-        if self.input_past_actions:
-            history = torch.stack(
-                [
-                    torch.Tensor(self.actions[i])
-                    for i in frame_idx
-                ],
-                dim=0,
-            )
-        else:
-            history = 0
+        # if self.input_past_actions:
+        #     history = torch.stack(
+        #         [
+        #             torch.Tensor(self.actions[i])
+        #             for i in frame_idx
+        #         ],
+        #         dim=0,
+        #     )
+        # else:
+        #     history = 0
 
         # Random cropping
         # if self.train:
@@ -260,9 +263,6 @@ class ImitationEpisode(Dataset):
         #         ]
 
         
-        # print(self.sample_rate_audio, self.resolution)
-        # print(audio_start, audio_end, (self.audio_gripper.shape))
-        
         if self.audio_gripper is not None:
             audio_end = idx * self.resolution
             audio_start = audio_end - self.audio_len * self.sample_rate_audio
@@ -275,7 +275,6 @@ class ImitationEpisode(Dataset):
             if self.norm_audio:
                 mel /= mel.sum(dim=-2, keepdim=True)
                 # print("mel", mel.shape, mel.min(), mel.max(), mel.mean(), mel.std())
-            
             # testing
             # sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
             # plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
@@ -286,50 +285,53 @@ class ImitationEpisode(Dataset):
         else:
             mel = 0
  
-        if self.stack_past_actions:
-            xyzgt = torch.stack(
-                [
-                    torch.Tensor(self.actions[i])
-                    for i in frame_idx
-                ],
-                dim=0,
-            )
+        # actions are always a list of N elements, just index however you want 
         
-        frame_idx = np.arange(idx, idx + self.stack_future_actions_dim)
-        frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1
 
-        if self.output_model != "aux":
-            if self.stack_past_actions:
-                xyzgt = torch.cat(
-                    [
-                        xyzgt,
-                        torch.stack(
-                            [
-                                torch.Tensor(self.actions[i]) if i < self.episode_length else torch.Tensor([0]*(self.action_dim - 1) + [1])
-                                for i in frame_idx 
-                            ],
-                            dim=0,
-                        ),
-                    ],
-                    dim=0,
-                )
-            else:
-                xyzgt = torch.stack(
-                            [
-                                torch.Tensor(self.actions[i]) if i < self.episode_length else torch.Tensor([0]*(self.action_dim - 1) + [1])
-                                for i in frame_idx
-                            ],
-                            dim=0,
-                        )
+        # if self.stack_past_actions:
+        #     xyzgt = torch.stack(
+        #         [
+        #             torch.Tensor(self.actions[i])
+        #             for i in frame_idx
+        #         ],
+        #         dim=0,
+        #     )
+        
+        # frame_idx = np.arange(idx, idx + self.stack_future_actions_dim)
+        # frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1
 
-        if not self.stack_past_actions and self.output_model == "aux":
-            xyzgt = torch.Tensor(self.actions[idx])
+        # if self.output_model != "aux":
+        #     if self.stack_past_actions:
+        #         xyzgt = torch.cat(
+        #             [
+        #                 xyzgt,
+        #                 torch.stack(
+        #                     [
+        #                         torch.Tensor(self.actions[i]) if i < self.episode_length else torch.Tensor([0]*(self.action_dim - 1) + [1])
+        #                         for i in frame_idx 
+        #                     ],
+        #                     dim=0,
+        #                 ),
+        #             ],
+        #             dim=0,
+        #         )
+        #     else:
+        #         xyzgt = torch.stack(
+        #                     [
+        #                         torch.Tensor(self.actions[i]) if i < self.episode_length else torch.Tensor([0]*(self.action_dim - 1) + [1])
+        #                         for i in frame_idx
+        #                     ],
+        #                     dim=0,
+        #                 )
+
+        # if not self.stack_past_actions and self.output_model == "aux":
+        #     xyzgt = torch.Tensor(self.actions[idx])
         
         # print(cam_gripper_framestack.shape, mel.shape, xyzgt.shape)
         return (
             (cam_gripper_framestack,
-            mel, history),
-            xyzgt,
+            mel),
+            (self.actions, frame_idx),
         )
     
 if __name__ == "__main__":
@@ -344,25 +346,27 @@ if __name__ == "__main__":
             'modalities': 'vg_ag',
             'resized_height_v': 75,
             'resized_width_v': 100,
+            'action_dim' : 11,
             'is_crop': False,
             'crop_percent': 0.1,
-            'stack_past_actions': True,
+            'output_model' : 'layered',
+            'stack_past_actions': False,
             'stack_future_actions': False,
             'stack_future_actions_dim': 6,
             'input_past_actions': False,
             'input_past_actions_dim': 6,
             'history_encoder_dim': 32,
-            'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
+            'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data',
             'num_stack': 6,
             'norm_audio' : True
         },
-        run_id = "0",
+        run_id = "20",
         train=True
     )
     print("Dataset size", len(dataset))
-    i = 220
-    (cam_gripper_framestack, mel_spec), xyzgt = dataset[i]
-    # print(cam_gripper_framestack.shape, audio_clip_g.shape, xyzgt.shape)
+    i = 120
+    print(len(dataset[i]))
+    (cam_gripper_framestack, mel_spec), (xyzgt, frame_idx) = dataset[i]
     # save images
     stacked = []
     print("actions", xyzgt.shape)
@@ -373,6 +377,5 @@ if __name__ == "__main__":
         img = np.clip(img, 0, 1)
         stacked.append(img.copy())
     stacked = np.vstack(stacked)
+    plt.imsave('temp/melspec.png', mel_spec[0].numpy(), cmap='viridis', origin='lower', )
     plt.imsave(f'temp/0.png', stacked)
-
-    

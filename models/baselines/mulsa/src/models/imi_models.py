@@ -49,18 +49,21 @@ class Actor(torch.nn.Module):
         self.action_dim = config["action_dim"]
         self.aux_mlp = nn.Linear(self.layernorm_embed_shape, self.action_dim) #6
 
-
         if self.output_model == "seq_pred":
             self.seq_pred_mlp = nn.Linear(self.layernorm_embed_shape, config["stack_future_actions_dim"]*self.action_dim) 
         
         if self.output_model == "layered":
             self.layered_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.Tanh()).to(self.device)] + \
                 [nn.Sequential(nn.Linear(self.action_dim, self.action_dim), nn.Tanh()).to(self.device) for i in range(config["stack_future_actions_dim"])] 
-                # [nn.Linear(self.action_dim, self.action_dim).to(self.device)] # no activations after last layer
+
         if self.output_model == "multi_head":
             self.multi_head_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.ReLU()).to(self.device)] + \
                 [nn.Linear(self.action_dim, self.action_dim).to(self.device) for i in range(config["stack_future_actions_dim"])] 
-        
+
+        # if self.output_model == 'lstm':
+        #     self.output_sequence_length = config["output_sequence_length"] # we want atleast 3 seconds so we can have 30 subsequent actions
+        #     self.decoder = nn.LSTM(self.layernorm_embed_shape, self.action_dim, num_layers=1, batch_first=True)
+
         if self.input_past_actions:  
             self.input_past_actions_dim = config["input_past_actions_dim"]
             self.history_encoder_dim = config["history_encoder_dim"]

@@ -1,6 +1,6 @@
 import torch
 torch.set_num_threads(1)
-
+import numpy as np
 import sys
 sys.path.append("")
 from models.baselines.mulsa.src.models.encoders import (
@@ -24,7 +24,7 @@ class MULSAInference(pl.LightningModule):
         self.actor = Actor(v_encoder, a_encoder, self.config)
 
         self.transform_image = transforms.Compose([
-            transforms.ToPILImage(),
+            transforms.ToPILImage(), ## why do need this transformation?
             transforms.Resize((self.config['resized_height_v'], self.config['resized_width_v'])),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -46,7 +46,8 @@ class MULSAInference(pl.LightningModule):
     def forward(self, inp):
 
         video = inp["video"] #list of images
-        video = torch.stack([self.transform_image(img) for img in video], dim=0)
+        # print(type(video[0]))
+        video = torch.stack([self.transform_image(img.astype(np.uint8)) for img in video], dim=0)
         video = video.unsqueeze(0)
         
         if self.use_audio:
