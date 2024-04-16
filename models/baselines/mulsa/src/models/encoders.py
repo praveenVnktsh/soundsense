@@ -100,20 +100,16 @@ class ASTEncoder(nn.Module):
         super().__init__()
         self.processor = AutoProcessor.from_pretrained("MIT/ast-finetuned-audioset-10-10-0.4593")
         self.model = ASTModel.from_pretrained("MIT/ast-finetuned-audioset-10-10-0.4593")
-        print("AST model")
-        print(self.model)
         # self.config = ASTConfig()
-        self.sr = 16000
+        self.sr = 16000 # Hardcoded
         self.fc = None
         if out_dim is not None:
-            self.fc = nn.Linear(1214*768, out_dim)
+            self.fc = nn.Linear(1214*768, out_dim) # Adds 1.5B params
 
     def forward(self, audio):
         # audio file is decoded on the fly
-        audio1 = audio.cpu().numpy().squeeze(1)
-        print(audio1.shape)
-        inputs = self.processor(audio1, sampling_rate=self.sr, return_tensors="pt").to(self.model.device)
-        with torch.no_grad():
+        inputs = self.processor(audio.cpu().numpy().squeeze(1), sampling_rate=self.sr, return_tensors="pt").to(self.model.device)
+        with torch.no_grad(): # finetune all layers?
             outputs = self.model(**inputs)
         x = outputs.last_hidden_state
         x = torch.flatten(x, 1)
@@ -167,7 +163,7 @@ if __name__ == "__main__":
     # ]
     # audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
     # audio_gripper = (audio_gripper).reshape(1,-1)
-    # audio_clip = clip_resample(audio_gripper, 0, 2*48000)
+    # audio_clip = clip_resample(audio_gripper, 0, 3*48000)
     # print(audio_clip.shape)
     # output = audio_encoder({"audio": {"array": audio_clip}})
     # print(output.shape)
