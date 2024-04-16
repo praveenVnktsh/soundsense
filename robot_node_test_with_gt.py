@@ -1,11 +1,12 @@
+import os
 import numpy as np
 import torch
-import stretch_body.robot
+# import stretch_body.robot
 import time
 import cv2
 import yaml
-import rospy
-from audio_common_msgs.msg import AudioDataStamped, AudioData
+# import rospy
+# from audio_common_msgs.msg import AudioDataStamped, AudioData
 import glob
 import soundfile as sf
 import torchaudio
@@ -24,16 +25,20 @@ class RobotNode:
         self.audio_n_seconds = params['audio_len']
         self.use_audio = "ag" in params['modalities'].split("_")
         self.norm_audio = params['norm_audio']
-
+        print("Using audio:", self.use_audio)
 
         self.n_stack_images = params['num_stack']
         self.history = {
             'audio': [0] * self.hz * self.audio_n_seconds,
             'video': [],
         }
-        run_id = '19'
+        run_id = '20'
+        self.run_id = run_id
+        os.makedirs(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{run_id}', exist_ok = True)
+        os.makedirs(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{run_id}/video', exist_ok = True)
         if not is_unimodal:
-            data = sf.read(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/processed_audio.wav')[0]
+            data = sf.read(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/{run_id}/processed_audio.wav')[0]
+            # data = sf.read(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/processed_audio.wav')[0]
             self.total_audio = torchaudio.functional.resample(torch.tensor(data), 48000, 16000).numpy()
             self.mel = torchaudio.transforms.MelSpectrogram(
                 sample_rate=self.hz, 
@@ -43,7 +48,8 @@ class RobotNode:
             )
         self.idx = 0
         self.model = model
-        self.images = sorted(glob.glob(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/video/*.png'))
+        self.images = sorted(glob.glob(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/{run_id}/video/*.png'))
+        # self.images = sorted(glob.glob(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/video/*.png'))
     
     def clip_resample(self, audio, audio_start, audio_end):
         left_pad, right_pad = torch.Tensor([]), torch.Tensor([])
@@ -91,11 +97,14 @@ class RobotNode:
         self.idx += 1
         if self.idx >= len(self.images):
             return None
+        print("idx", self.idx)
         path = self.images[self.idx]
         frame = cv2.imread(path)
         frame = cv2.resize(frame, (h, w))
         # frame = np.random.randint(0, 255, (h, w, 3)).astype(np.uint8)
         # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        ## same frames
+        cv2.imwrite(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{self.run_id}/video/frame_{self.idx}.jpg', frame)
         return frame
 
     def run_loop(self, visualize = False):
@@ -113,7 +122,7 @@ class RobotNode:
         #     self.history['video'].append(frame)
 
         audio_per_frame = self.hz / loop_rate
-
+        hist_actions = []
         while is_run:
             frame = self.get_image()
             self.history['video'].append(frame)
@@ -133,18 +142,24 @@ class RobotNode:
                     self.history['audio'] = np.array([0] * pad_length + self.total_audio[:audio_end].tolist())
                 else:
                     self.history['audio'] = self.total_audio[audio_start:audio_end]
-
-                self.execute_action()
+                # try:
+                hist_actions = self.execute_action(hist_actions)
+                # except Exception as e:
+                #     print("Error in execute action", e)
+                #     is_run = False
                 # time.sleep(0.1)
+        filepath = f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{self.run_id}/actions.txt'
+        np.savetxt(filepath, hist_actions, fmt='%s')
         print("Ending run loop")
 
-    def execute_action(self):
+    def execute_action(self, hist_actions=[]):
         # lift, extension, lateral, roll, gripper
         # action_space = [del_extension, del_height, del_lateral, del_roll, del_gripper]
         # action[0] = np.clip(action[0], -0.01, 0.01)
         
-        inputs = self.generate_inputs()
+        inputs = self.generate_inputs(False)
         # with torch.no_grad():
+        print("inputs", inputs['video'][0].shape)
         outputs = self.model(inputs).squeeze() # 11 dimensional
         outputs = torch.nn.functional.softmax(outputs, dim = 0)
         mapping = {
@@ -164,11 +179,13 @@ class RobotNode:
 
         action_idx = torch.argmax(outputs).item()
         print("action: ", inv_mapping[action_idx], "output: ", outputs.detach().numpy().tolist())
+        hist_actions.append(inv_mapping[action_idx])
+        return hist_actions
     def generate_inputs(self, save = True):
-        
+        print("video shape", len(self.history['video']))
         video = self.history['video'].copy() # subsample n_frames of interest
         n_images = len(video)
-
+        ## This is different then training?
         choose_every = n_images // self.n_stack_images
 
         video = video[::choose_every]
@@ -220,10 +237,12 @@ class RobotNode:
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]
         # a_inp: [batch, 1, T]
-        
+        print("Old video shape", video[0].shape, len(video))
+
         video = video[-self.n_stack_images:]
+        # video = [(img)/ 255.0 for img in video]
         video = [(img).astype(np.float32)/ 255.0 for img in video]
-        
+        print("video shape", video[0].shape, len(video))
         return {
             'video' : video, # list of images
             'audio' : mel, # audio buffer
