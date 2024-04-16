@@ -62,7 +62,8 @@ def main(config):
     val_loader = DataLoader(val_set, config["batch_size"], num_workers=config["num_workers"], shuffle=False)
 
     v_encoder = make_vision_encoder(config['encoder_dim'])
-    a_encoder = make_audio_encoder(config['encoder_dim'] * config['num_stack'], config['norm_audio'])
+    a_encoder = make_audio_encoder(config['encoder_dim'] * config['num_stack'], config['norm_audio'], model=config["audio_encoder"])
+    # a_encoder = make_audio_encoder(config['encoder_dim'] * config['num_stack'], config['norm_audio'])
 
     imi_model = Actor(v_encoder, a_encoder, config)
     optimizer = torch.optim.Adam(imi_model.parameters(), lr=config['lr'])
@@ -85,10 +86,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str, required=True, help="Path to config file")
-    parser.add_argument("--mha", type='store_true', help="Use MHA")
+    parser.add_argument("--mha", action='store_true', help="Use MHA")
     parser.add_argument("--decoder", type=str, help="Decoder type", 
                         choices=['layered', 'multi_head', 'lstm', 'simple'], required=True)
-    parser.add_argument("--use_audio", type='store_true', help="Use audio")
+    parser.add_argument("--use_audio", action='store_true', help="Use audio")
+    parser.add_argument('--output_sequence_length', type=int, required=True, help='Output sequence length')
+    parser.add_argument('--audio_len', type=int, help='Output sequence length')
+    parser.add_argument('--audio_encoder', type=str, default='spec', help='Audio encoder', choices=['spec', 'ast'])
     args = parser.parse_args()
     
 
@@ -97,15 +101,18 @@ if __name__ == "__main__":
 
     config['use_mha'] = args.mha
     config['decoder_type'] = args.decoder
-
+    config['output_sequence_length'] = args.output_sequence_length
+    if args.audio_len:
+        config['audio_len'] = args.audio_len
     if args.use_audio:
         config['modalities'] = 'vg_ag'
     else:
         config['modalities'] = 'vg'
     
-    
-    config['exp_name'] = 'imi_' + config['modalities'] + '_' + config['decoder_type'] 
+    config['audio_encoder'] = args.audio_encoder
+    config['exp_name'] = 'imi_' + config['modalities'] + '_' + config['decoder_type'] + "_seqlen_" + str(config['output_sequence_length'])
     if config['use_mha']:
         config['exp_name'] += '_mha'
+    config['exp_name'] += "_"+config['audio_encoder']
 
     main(config)
