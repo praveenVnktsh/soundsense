@@ -384,11 +384,14 @@ if __name__ == "__main__":
             'input_past_actions': False,
             'input_past_actions_dim': 6,
             'history_encoder_dim': 32,
-            'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data',
+            'output_sequence_length' : 1,
+            'action_history_length': 0,
+            # 'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data',
+            'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
             'num_stack': 6,
             'norm_audio' : True
         },
-        run_id = "20",
+        run_id = "0",
         train=True
     )
     print("Dataset size", len(dataset))
