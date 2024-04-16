@@ -18,57 +18,70 @@ class Actor(torch.nn.Module):
         self.a_encoder = a_encoder
 
         self.layernorm_embed_shape = config["encoder_dim"] * config["num_stack"]
-        print("Layernorm embed shape:", self.layernorm_embed_shape)
         self.encoder_dim = config["encoder_dim"]
         self.use_mha = config["use_mha"]
         self.modalities = config["modalities"].split("_")
-        self.output_model = config["output_model"] if  'output_model' in config.keys() else 'aux'
+        self.decoder_type = config["output_model"] if  'output_model' in config.keys() else 'simple'
         self.input_past_actions = config["input_past_actions"] if 'input_past_actions' in config.keys() else False
     
         self.query = nn.Parameter(torch.randn(1, 1, self.layernorm_embed_shape))
         self.embed_dim = self.layernorm_embed_shape * len(self.modalities)
+        
+        print("Layernorm embed shape:", self.layernorm_embed_shape)
         print("embed_dim:", self.layernorm_embed_shape )
+        
         self.layernorm = nn.LayerNorm(self.layernorm_embed_shape)
-        self.mha = MultiheadAttention(self.layernorm_embed_shape, config["num_heads"])
-
-        self.bottleneck = nn.Linear(
+        self.encoder_bottleneck = nn.Linear(
             self.embed_dim, self.layernorm_embed_shape
-        )  # if we dont use mha
+        ) 
 
-        # self.mlp = torch.nn.Sequential(
-        #     torch.nn.Linear(self.layernorm_embed_shape, 1024),
-        #     torch.nn.ReLU(),
-        #     torch.nn.Linear(1024, 1024),
-        #     torch.nn.ReLU(),
-        #     torch.nn.Linear(1024, 3**3),
-        # )
+        if self.use_mha:
+            self.mha = MultiheadAttention(self.layernorm_embed_shape, config["num_heads"])
+
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
         else:
             self.device = torch.device("cpu")
+
         self.action_dim = config["action_dim"]
-        self.aux_mlp = nn.Linear(self.layernorm_embed_shape, self.action_dim) #6
+        self.output_sequence_length = config['output_sequence_length']
 
-        if self.output_model == "seq_pred":
-            self.seq_pred_mlp = nn.Linear(self.layernorm_embed_shape, config["stack_future_actions_dim"]*self.action_dim) 
         
-        if self.output_model == "layered":
-            self.layered_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.Tanh()).to(self.device)] + \
-                [nn.Sequential(nn.Linear(self.action_dim, self.action_dim), nn.Tanh()).to(self.device) for i in range(config["stack_future_actions_dim"])] 
+        
+        if self.decoder_type == 'simple':
+            self.decoder = nn.Sequential(
+                nn.Linear(self.layernorm_embed_shape, self.layernorm_embed_shape//2),
+                nn.ReLU(),
+                nn.Linear(self.layernorm_embed_shape//2, self.layernorm_embed_shape//2),
+                nn.ReLU(),
+                nn.Linear(self.layernorm_embed_shape//2, self.output_sequence_length * self.action_dim)
+            )
+        else:
+            self.decoder_bottleneck = nn.Sequential(
+                nn.Linear(self.layernorm_embed_shape, self.layernorm_embed_shape//2),
+                nn.ReLU(),
+                nn.Linear(self.layernorm_embed_shape//2, self.layernorm_embed_shape//4),
+                nn.ReLU(),
+                nn.Linear(self.layernorm_embed_shape//4, self.action_dim),
+                nn.ReLU()
+            )
 
-        if self.output_model == "multi_head":
-            self.multi_head_mlps = [nn.Sequential(nn.Linear(self.layernorm_embed_shape, self.action_dim), nn.ReLU()).to(self.device)] + \
-                [nn.Linear(self.action_dim, self.action_dim).to(self.device) for i in range(config["stack_future_actions_dim"])] 
-
-        # if self.output_model == 'lstm':
-        #     self.output_sequence_length = config["output_sequence_length"] # we want atleast 3 seconds so we can have 30 subsequent actions
-        #     self.decoder = nn.LSTM(self.layernorm_embed_shape, self.action_dim, num_layers=1, batch_first=True)
-
-        if self.input_past_actions:  
-            self.input_past_actions_dim = config["input_past_actions_dim"]
-            self.history_encoder_dim = config["history_encoder_dim"]
-            self.history_mlp = [nn.Sequential(nn.Linear(self.input_past_actions_dim*self.action_dim, self.history_encoder_dim), nn.Tanh()).to(self.device)] + \
-                [nn.Sequential(nn.Linear(self.layernorm_embed_shape+self.history_encoder_dim, self.layernorm_embed_shape), nn.Tanh()).to(self.device)]
+        if self.decoder_type == "layered" or self.decoder_type == "multi_head":
+            self.decoder = [
+                nn.Sequential(nn.Linear(self.action_dim, self.action_dim), nn.Tanh()).to(self.device) 
+                for i in range(config["stack_future_actions_dim"])
+            ]
+        if self.decoder_type == 'lstm':
+            self.decoder = nn.LSTM(
+                self.action_dim, 
+                self.action_dim, 
+                num_layers=1, 
+                batch_first=True
+            )
+            # self.input_past_actions_dim = config["input_past_actions_dim"]
+            # self.history_encoder_dim = config["history_encoder_dim"]
+            # self.history_mlp = [nn.Sequential(nn.Linear(self.input_past_actions_dim*self.action_dim, self.history_encoder_dim), nn.Tanh()).to(self.device)] + \
+            #     [nn.Sequential(nn.Linear(self.layernorm_embed_shape+self.history_encoder_dim, self.layernorm_embed_shape), nn.Tanh()).to(self.device)]
 
     def forward(self, inputs):
         """
@@ -76,15 +89,11 @@ class Actor(torch.nn.Module):
             cam_gripper_framestack,audio_clip_g,
             vg_inp: [batch, num_stack, 3, H, W]
             a_inp: [batch, 1, T]
-
         """
-        if len(inputs) == 3:
-            vg_inp, audio_g, history = inputs
-        else:
-            vg_inp, audio_g = inputs
-            history = None
+        vg_inp, audio_g = inputs
+        
+        # encoders
         embeds = []
-
         if "vg" in self.modalities:
             batch, num_stack, _, Hv, Wv = vg_inp.shape
             # print(vg_inp.shape,batch * num_stack, 3, Hv, Wv )
@@ -112,48 +121,51 @@ class Actor(torch.nn.Module):
             mha_out += mlp_inp
             mlp_inp = torch.concat([mha_out[i] for i in range(mha_out.shape[0])], 1)
             # print("mha_out", mha_out.shape, "mlp_inp:", mlp_inp.shape)
-            mlp_inp = self.bottleneck(mlp_inp)
+            mlp_inp = self.encoder_bottleneck(mlp_inp)
             # mlp_inp = mha_out.squeeze(0) # [batch, D]
         else:
             mlp_inp = torch.cat(embeds, dim=-1)
             # print(mlp_inp.shape)
-            mlp_inp = self.bottleneck(mlp_inp)
+            mlp_inp = self.encoder_bottleneck(mlp_inp)
             weights = None
 
+        # apply layernorm.
+        mlp_inp = self.layernorm(mlp_inp)
 
-        if self.input_past_actions:
-            # print("history", history.shape)
-            history = history.view(-1, self.input_past_actions_dim*self.action_dim)
-            history = self.history_mlp[0](history)
-            mlp_inp = torch.concat([mlp_inp, history], dim=-1)
-            mlp_inp = self.history_mlp[1](mlp_inp)
-            # print("mlp_inp", mlp_inp.shape)
-
-        # action_logits = self.mlp(mlp_inp)
-        if self.output_model == "seq_pred":
-            out = self.seq_pred_mlp(mlp_inp)
-
-        elif self.output_model == "layered":
-            out1 = self.layered_mlps[0](mlp_inp) # embed_dim, action_dim
-            out = torch.Tensor([]).to(self.device)
-            for i in range(1, len(self.layered_mlps)):
-                out1 = self.layered_mlps[i](out1)
-                out = torch.cat([out, out1.clone()], dim=0) # [Linear(action_dim, action_dim), Tanh()] (except last layer)
-            out = out.view(-1, len(self.layered_mlps)-1, self.action_dim) # [batch, stack_future_actions_dim, action_dim]
-
-        elif self.output_model == "multi_head":
-            out1 = self.multi_head_mlps[0](mlp_inp) # embed_dim, action_dim
-            out = torch.Tensor([]).to(self.device)
-            for i in range(1, len(self.multi_head_mlps)):
-                out2 = self.multi_head_mlps[i](out1) # all heads output on same out1
-                out = torch.cat([out, out2.clone()], dim=0) # [Linear(action_dim, action_dim), ReLU()] (except last layer)
-            out = out.view(-1, len(self.multi_head_mlps)-1, self.action_dim) # [batch, stack_future_actions_dim, action_dim]
-            
-        elif self.output_model == "aux":
-            out = self.aux_mlp(mlp_inp)
-
+        if self.decoder_type == "simple":
+            out = self.decoder(mlp_inp)
         else:
-            raise ValueError("Invalid output model in config")
+            mlp_inp = self.decoder_bottleneck(mlp_inp) # the bottleneck
+            pred = self.decoder_bottleneck(mlp_inp) # the bottleneck
+
+            if self.decoder_type == "layered":
+                out = torch.tensor([]).to(self.device)
+                outs = []
+                for i in range(len(self.decoder)):
+                    pred = self.decoder[i](pred)
+                    outs.append(pred)
+                out = torch.stack(outs, dim=1) # [batch, stack_future_actions_dim, action_dim]
+
+            elif self.decoder_type == "multi_head":
+                
+                out = torch.tensor([]).to(self.device)
+                outs = []
+                for i in range(len(self.decoder)):
+                    outs.append(self.decoder[i](pred))
+                out = torch.stack(outs, dim=1) # [batch, stack_future_actions_dim, action_dim]
+
+            elif self.decoder_type == "lstm":
+                batch_size = mlp_inp.shape[0]
+                h0 = torch.zeros(1, batch_size, self.action_dim).to(self.device)
+                c0 = torch.zeros(1, batch_size, self.action_dim).to(self.device)
+                outs = []
+                for t in range(self.output_sequence_length):
+                    out, (h0, c0) = self.decoder(pred, (h0, c0))  
+                    outs.append(out)
+                    pred = out.unsqueeze(1)
+
+                out = torch.stack(outs, dim=1) # [batch, seq_len, action_dim]
+
         return out, weights, mlp_inp
 
     
@@ -167,7 +179,10 @@ class Actor(torch.nn.Module):
             return self.v_encoder.vision_activations.detach(), None
     
 if __name__ == "__main__":
-    pass
+    from encoders import make_vision_encoder, make_audio_encoder
+    vision_encoder = make_vision_encoder(128)
+    audio_encoder = make_audio_encoder(128)
+    model = Actor(vision_encoder, audio_encoder, config={})
     # vision_encoder = make_vision_encoder(128)
     # empty_input = torch.zeros((1, 3, 64, 101))
     # print(vision_encoder(empty_input).shape)

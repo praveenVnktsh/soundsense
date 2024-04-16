@@ -51,7 +51,8 @@ class ImitationEpisode(Dataset):
         # self.stack_past_actions = config['stack_past_actions']
         # self.stack_future_actions_dim = config['stack_future_actions_dim']
         # self.output_model = config['output_model']
-
+        self.output_sequence_length = config['output_sequence_length']
+        self.action_history_length = config['action_history_length']
         self.dataset_root = config['dataset_root']
         self.norm_audio = config['norm_audio']
         
@@ -233,8 +234,7 @@ class ImitationEpisode(Dataset):
                         for fidx in frame_idx
                     ],
                     dim=0,
-                )
-            
+                )         
         else:
             cam_gripper_framestack = 0
 
@@ -299,7 +299,7 @@ class ImitationEpisode(Dataset):
         
         # frame_idx = np.arange(idx, idx + self.stack_future_actions_dim)
         # frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1
-
+        
         # if self.output_model != "aux":
         #     if self.stack_past_actions:
         #         xyzgt = torch.cat(
@@ -328,10 +328,38 @@ class ImitationEpisode(Dataset):
         #     xyzgt = torch.Tensor(self.actions[idx])
         
         # print(cam_gripper_framestack.shape, mel.shape, xyzgt.shape)
+
+        start_idx = idx
+        end_idx = idx + self.output_sequence_length
+        padding = torch.tensor([]) if end_idx <= self.episode_length else torch.tensor([[0] * (self.action_dim - 1) + [1]] * (end_idx - self.episode_length))
+
+        action_trajectory = torch.cat(
+            [
+                self.actions[start_idx:end_idx],
+                padding
+            ],
+            dim=0
+        )
+
+        start_idx = idx - self.action_history_length
+        end_idx = idx 
+        padding = torch.tensor([]) if start_idx >= 0 else torch.tensor([[0] * (self.action_dim - 1) + [1]] * (-start_idx))
+
+        action_history = torch.cat(
+            [
+                padding,
+                self.actions[start_idx:end_idx]
+            ],
+            dim=0
+        )
+
+        
+
+
         return (
             (cam_gripper_framestack,
             mel),
-            (self.actions, frame_idx),
+            (action_trajectory, action_history),
         )
     
 if __name__ == "__main__":

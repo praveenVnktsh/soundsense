@@ -19,34 +19,37 @@ class ImiEngine(LightningModule):
         self.scheduler = scheduler
         self.config = config
 
-        self.loss_cce = torch.nn.CrossEntropyLoss()
+        self.loss_cce = torch.nn.CrossEntropyLoss(reduction='mean')
         self.validation_step_outputs = []
 
         self.wrong = 1
         self.correct = 0
         self.total = 0
+        
+        self.output_sequence_length = config['output_sequence_length']
+        self.action_dim = config["action_dim"]
+        self.decoder_type = config["output_model"] if  'output_model' in config.keys() else 'simple'
         self.save_hyperparameters(config)
-        print("baseline learn")
 
     def compute_loss(self, xyz_gt, xyz_pred):
-        # print("xyz_pred", xyz_pred.size())
-        # print("xyz_gt", xyz_gt.size())
-        # loss = self.loss_cce(xyz_pred, xyz_gt.view(xyz_gt.size(0), -1))
-        if self.config["output_model"] == "seq_pred":
-            pred_copy = xyz_pred.clone().view(xyz_gt.size(0), xyz_gt.size(1), -1)
+        
+        gt_future_actions, past_actions = xyz_gt # both are [batch_size, seq_len, action_dim]
+        B, Fl, _ = gt_future_actions.size()
+
+        # xyz_pred = [B, Seq, Action_dim]
+
+        if self.decoder_type == 'simple':
+            gt_future_actions = gt_future_actions.view(B, -1)
+            pred_future_actions = xyz_pred.view(B, -1)
+            loss = self.loss_cce(pred_future_actions, gt_future_actions)
+
+
+        if self.decoder_type in ["layered", 'multi_head', 'lstm']:    
             loss = 0
-            for i in range(xyz_gt.size(1)):
-                loss += self.loss_cce(pred_copy[:, i, :], xyz_gt[:, i, :])
-            loss /= xyz_gt.size(1)
-        elif self.config["output_model"] == "layered" or self.config["output_model"] == "multi_head":
-            loss = 0
-            for i in range(xyz_gt.size(1)):
-                loss += self.loss_cce(xyz_pred[:, i, :], xyz_gt[:, i, :])
-            loss /= xyz_gt.size(1)
-        elif self.config["output_model"] == "aux":
-            loss = self.loss_cce(xyz_pred, xyz_gt)
-        # if self.config["stack_future_actions"]:
-        #     loss = torch.mean(loss)
+            for i in range(gt_future_actions.size(1)):
+                loss += self.loss_cce(xyz_pred[:, i, :], gt_future_actions[:, i, :])
+            loss /= gt_future_actions.size(1)
+        
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -70,7 +73,7 @@ class ImiEngine(LightningModule):
         #     demo, action_logits, xyzrpy_gt, xyzrpy_pred
         # )
         inputs, xyzgt_gt = batch
-        xyzgt_pred, weights, _ = self.actor(inputs)  # , idx)
+        xyzgt_pred, weights, _ = self.actor(inputs) 
         loss = self.compute_loss(xyzgt_gt, xyzgt_pred)
         self.log_dict(
             {"val/loss": loss}, prog_bar=True, on_epoch=True
