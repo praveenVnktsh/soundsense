@@ -140,7 +140,7 @@ class Actor(torch.nn.Module):
             out = self.decoder(mlp_inp)
             out = out.view(-1, self.output_sequence_length, self.action_dim)
         else:
-            pred = self.decoder_bottleneck(mlp_inp) # the bottleneck
+            pred = self.decoder_bottleneck(mlp_inp).to(self.device) # the bottleneck
             if self.decoder_type == "layered":
                 out = torch.tensor([]).to(self.device)
                 for i in range(len(self.decoder)):

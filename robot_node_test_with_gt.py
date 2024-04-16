@@ -12,7 +12,7 @@ import soundfile as sf
 import torchaudio
 
 class RobotNode:
-    def __init__(self, config_path, model, is_unimodal = False, testing = False):
+    def __init__(self, config_path, model, is_unimodal = False, testing = False, run_id='20'):
         # self.r = stretch_body.robot.Robot()
         # self.boot_robot()
         
@@ -32,7 +32,6 @@ class RobotNode:
             'audio': [0] * self.hz * self.audio_n_seconds,
             'video': [],
         }
-        run_id = '20'
         self.run_id = run_id
         os.makedirs(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{run_id}', exist_ok = True)
         os.makedirs(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{run_id}/video', exist_ok = True)
@@ -142,11 +141,11 @@ class RobotNode:
                     self.history['audio'] = np.array([0] * pad_length + self.total_audio[:audio_end].tolist())
                 else:
                     self.history['audio'] = self.total_audio[audio_start:audio_end]
-                # try:
-                hist_actions = self.execute_action(hist_actions)
-                # except Exception as e:
-                #     print("Error in execute action", e)
-                #     is_run = False
+                try:
+                    hist_actions = self.execute_action(hist_actions)
+                except Exception as e:
+                    print("Error in execute action", e)
+                    is_run = False
                 # time.sleep(0.1)
         filepath = f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{self.run_id}/actions.txt'
         np.savetxt(filepath, hist_actions, fmt='%s')
@@ -161,6 +160,8 @@ class RobotNode:
         # with torch.no_grad():
         print("inputs", inputs['video'][0].shape)
         outputs = self.model(inputs).squeeze() # 11 dimensional
+        print("model output shape", outputs.shape)
+        outputs = outputs[0] # take 0th action from sequence predicted
         outputs = torch.nn.functional.softmax(outputs, dim = 0)
         mapping = {
             'w': 0, 
@@ -178,7 +179,7 @@ class RobotNode:
         inv_mapping = {v: k for k, v in mapping.items()}
 
         action_idx = torch.argmax(outputs).item()
-        print("action: ", inv_mapping[action_idx], "output: ", outputs.detach().numpy().tolist())
+        print("action: ", inv_mapping[action_idx], "output: ", outputs.cpu().detach().numpy().tolist())
         hist_actions.append(inv_mapping[action_idx])
         return hist_actions
     def generate_inputs(self, save = True):
@@ -242,7 +243,7 @@ class RobotNode:
         video = video[-self.n_stack_images:]
         # video = [(img)/ 255.0 for img in video]
         video = [(img).astype(np.float32)/ 255.0 for img in video]
-        print("video shape", video[0].shape, len(video))
+        print("video shape", type(video[0]), video[0].shape, len(video))
         return {
             'video' : video, # list of images
             'audio' : mel, # audio buffer

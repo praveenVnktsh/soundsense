@@ -21,11 +21,12 @@ if __name__ == "__main__":
     # model.eval()
     # If using MULSA, change out to out[0] in inference.py line 99
     
-    model_root = "/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/old_logs/"
+    # model_root = "/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/old_logs/"
     # model_root = "/home/hello-robot/soundsense/soundsense/models/baselines/mulsa/trained_models/"
-    # model_root += "mulsa_cnn_unimodal_full_task04-07-12:35:14"
+    model_root = '/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/lightning_logs/'
+    model_root += "imi_vg_layered_seqlen_10_mha_spec04-16-17:45:26"
     # model_root += "mulsa_mha_audio_full_task04-09-15:48:16"
-    model_root += "mulsa_mha_unimodal_full_task04-12-13:58:09"
+    # model_root += "mulsa_mha_unimodal_full_task04-12-13:58:09"
     # model_root += "mulsa_mha_audio_full_task04-13-21:41:35"
     model_root += '/'
     model_name = 'last.ckpt'
