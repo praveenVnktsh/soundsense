@@ -5,6 +5,7 @@ from torchvision.models.feature_extraction import (
 )
 import torch
 from torch import nn
+import torchvision
 
 # from perceiver_pytorch import Perceiver
 import torch.nn.functional as F
@@ -94,7 +95,7 @@ class Spec_Encoder(Encoder):
 
 
 def make_vision_encoder(out_dim=None):
-    vision_extractor = resnet18(pretrained=True)
+    vision_extractor = resnet18(weights = torchvision.models.ResNet18_Weights.DEFAULT)
     vision_extractor.conv1 = nn.Conv2d(
         5, 64, kernel_size=7, stride=1, padding=3, bias=False
     )
@@ -114,7 +115,7 @@ def make_vision_encoder(out_dim=None):
 #     return encoder
 
 def make_audio_encoder(out_dim=None, norm_audio=False):
-    audio_extractor = resnet18(pretrained=True)
+    audio_extractor = resnet18(weights = torchvision.models.ResNet18_Weights.DEFAULT)
     audio_extractor.conv1 = nn.Conv2d(
         3, 64, kernel_size=7, stride=1, padding=3, bias=False
     )

@@ -27,11 +27,10 @@ print(sys.version)
 print(torch.__version__)
 print(torch.version.cuda)
 
-def main(config_path):
+def main(config):
 
     # dataset_root
-    with open(config_path) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
+    
         
     np.random.seed(0)
     run_ids = os.listdir(config['dataset_root'])
@@ -82,12 +81,31 @@ def main(config_path):
 
 if __name__ == "__main__":
     import sys
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, required=True, help="Path to config file")
+    parser.add_argument("--mha", type='store_true', help="Use MHA")
+    parser.add_argument("--decoder", type=str, help="Decoder type", 
+                        choices=['layered', 'multi_head', 'lstm', 'simple'], required=True)
+    parser.add_argument("--use_audio", type='store_true', help="Use audio")
+    args = parser.parse_args()
     
-    if len(sys.argv) < 2:
-        print("Usage: python train.py <config_path>")
-        exit(0)
 
-    config_path = sys.argv[1]
+    with open(args.config_path) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
 
-    print("CONFIG PATH: ", config_path)
-    main(config_path = config_path)
+    config['use_mha'] = args.mha
+    config['decoder_type'] = args.decoder
+
+    if args.use_audio:
+        config['modalities'] = 'vg_ag'
+    else:
+        config['modalities'] = 'vg'
+    
+    
+    config['exp_name'] = 'imi_' + config['modalities'] + '_' + config['decoder_type'] 
+    if config['use_mha']:
+        config['exp_name'] += '_mha'
+
+    main(config)
