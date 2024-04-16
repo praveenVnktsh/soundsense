@@ -1,3 +1,6 @@
+import os
+import numpy as np
+import soundfile as sf
 from torchvision.models import resnet18
 from torchvision.models.feature_extraction import (
     create_feature_extractor,
@@ -6,7 +9,7 @@ from torchvision.models.feature_extraction import (
 import torch
 from torch import nn
 import torchvision
-
+from transformers import AutoProcessor, ASTModel, ASTConfig
 # from perceiver_pytorch import Perceiver
 import torch.nn.functional as F
 import torchaudio
@@ -92,7 +95,31 @@ class Spec_Encoder(Encoder):
     def audio_activation_hook(self, grad):
         self.audio_gradients = grad
 
+class ASTEncoder(nn.Module):
+    def __init__(self, out_dim=None):
+        super().__init__()
+        self.processor = AutoProcessor.from_pretrained("MIT/ast-finetuned-audioset-10-10-0.4593")
+        self.model = ASTModel.from_pretrained("MIT/ast-finetuned-audioset-10-10-0.4593")
+        print("AST model")
+        print(self.model)
+        # self.config = ASTConfig()
+        self.sr = 16000
+        self.fc = None
+        if out_dim is not None:
+            self.fc = nn.Linear(1214*768, out_dim)
 
+    def forward(self, audio):
+        # audio file is decoded on the fly
+        audio1 = audio.cpu().numpy().squeeze(1)
+        print(audio1.shape)
+        inputs = self.processor(audio1, sampling_rate=self.sr, return_tensors="pt").to(self.model.device)
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+        x = outputs.last_hidden_state
+        x = torch.flatten(x, 1)
+        if self.fc is not None:
+            x = self.fc(x)
+        return x
 
 def make_vision_encoder(out_dim=None):
     vision_extractor = resnet18(weights = torchvision.models.ResNet18_Weights.DEFAULT)
@@ -114,16 +141,34 @@ def make_vision_encoder(out_dim=None):
 #     )
 #     return encoder
 
-def make_audio_encoder(out_dim=None, norm_audio=False):
-    audio_extractor = resnet18(weights = torchvision.models.ResNet18_Weights.DEFAULT)
-    audio_extractor.conv1 = nn.Conv2d(
-        3, 64, kernel_size=7, stride=1, padding=3, bias=False
-    )
-    audio_extractor = create_feature_extractor(audio_extractor, ["layer4.1.relu_1"])
-    return Spec_Encoder(audio_extractor, out_dim, norm_audio)
+def make_audio_encoder(out_dim=None, norm_audio=False, model="spec"):
+    if model == "spec":
+        audio_extractor = resnet18(weights = torchvision.models.ResNet18_Weights.DEFAULT)
+        audio_extractor.conv1 = nn.Conv2d(
+            3, 64, kernel_size=7, stride=1, padding=3, bias=False
+        )
+        audio_extractor = create_feature_extractor(audio_extractor, ["layer4.1.relu_1"])
+        return Spec_Encoder(audio_extractor, out_dim, norm_audio)
+    elif model == "ast":
+        return ASTEncoder(out_dim)
 
 
 if __name__ == "__main__":
     inp = torch.zeros((1, 3, 480, 640))
     encoder = make_vision_encoder(64, 1280)
-    # print(encoder(inp).shape)
+    print(encoder(inp).shape)
+    # episode_folder = "/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/30"
+    # audio_encoder = make_audio_encoder(256*6, model="ast")
+    # audio_gripper1 = sf.read(os.path.join(episode_folder, "processed_audio.wav"))[0]
+    #     # print("Audio loaded")
+
+    # audio_gripper = [
+    #     x for x in audio_gripper1 if x is not None
+    # ]
+    # audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
+    # audio_gripper = (audio_gripper).reshape(1,-1)
+    # audio_clip = clip_resample(audio_gripper, 0, 2*48000)
+    # print(audio_clip.shape)
+    # output = audio_encoder({"audio": {"array": audio_clip}})
+    # print(output.shape)
+

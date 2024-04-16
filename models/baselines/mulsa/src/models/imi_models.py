@@ -43,9 +43,6 @@ class Actor(torch.nn.Module):
             self.device = torch.device("cpu")
 
         
-
-        
-        
         if self.decoder_type == 'simple':
             print("Creating simple decoder")
             self.decoder = nn.Sequential(
@@ -194,11 +191,13 @@ if __name__ == "__main__":
         'output_sequence_length': 30,
         'audio_len' : 3,
         'grayscale': False,
-        'norm_audio': True
+        'norm_audio': True,
+        'audio_encoder': 'spec'
     }
     torch.manual_seed(0)
     vision_encoder = make_vision_encoder(config['encoder_dim'])
-    audio_encoder = make_audio_encoder(config['encoder_dim'] * config['num_stack'], config['norm_audio'])
+    # audio_encoder = make_audio_encoder(config['encoder_dim'] * config['num_stack'], config['norm_audio'])
+    audio_encoder = make_audio_encoder(config['encoder_dim'] * config['num_stack'], config['norm_audio'], model=config["audio_encoder"])
     model = Actor(vision_encoder, audio_encoder, config).cuda()
     audio_in = torch.zeros((2, 1, 64, 301)).cuda()
     video_in = torch.zeros((2, 6, 3, 75, 100)).cuda()

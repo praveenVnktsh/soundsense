@@ -14,7 +14,8 @@ import glob
 import matplotlib.pyplot as plt
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-
+from transformers import AutoProcessor
+import transformers
 class ImitationEpisode(Dataset):
     def __init__(self, 
             config,
@@ -138,6 +139,9 @@ class ImitationEpisode(Dataset):
                 hop_length=int(self.resample_rate_audio * 0.01), 
                 n_mels=64
             )
+            self.audio_encoder = config["audio_encoder"] if "audio_encoder" in config else "spec"
+        transformers.utils.logging.set_verbosity_error()
+        
 
     def load_image(self, idx):
         img_path = self.image_paths[idx]
@@ -269,12 +273,15 @@ class ImitationEpisode(Dataset):
             audio_clip_g = self.clip_resample(
                 self.audio_gripper, audio_start, audio_end
             ).float()
-            eps = 1e-8
-            mel = self.mel(audio_clip_g)
-            mel = np.log(mel + eps)
-            if self.norm_audio:
-                mel /= mel.sum(dim=-2, keepdim=True)
-                # print("mel", mel.shape, mel.min(), mel.max(), mel.mean(), mel.std())
+            if self.audio_encoder == "spec":
+                eps = 1e-8
+                mel = self.mel(audio_clip_g)
+                mel = np.log(mel + eps)
+                if self.norm_audio:
+                    mel /= mel.sum(dim=-2, keepdim=True)
+                    # print("mel", mel.shape, mel.min(), mel.max(), mel.mean(), mel.std())
+            else:
+                mel = audio_clip_g
             # testing
             # sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
             # plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
