@@ -16,6 +16,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from transformers import AutoProcessor
 import transformers
+import cv2
 class ImitationEpisode(Dataset):
     def __init__(self, 
             config,
@@ -87,48 +88,55 @@ class ImitationEpisode(Dataset):
             p_apply /= p_apply.sum()
             p_apply *= 0.5
             self.transform_cam = A.Compose([
-                A.Resize(height=self.resized_height_v, width=self.resized_width_v),
-                A.GaussianBlur(
-                    sigma_limit=(0.2, 0.6),
-                    p=p_apply[0]
-                ),  # Gaussian blur with 10% probability
-                A.OneOf([
-                    A.RandomBrightnessContrast(
-                        brightness_limit=0.15,
-                        contrast_limit=0.15,
-                        p = 0.5,
-                    ),# Random brightness and contrast adjustments with 20% probability
-                    A.ColorJitter(
-                        brightness=0, contrast=0, saturation=0, hue=0.1,
-                        p = 0.5
-                    ),
-                ], p=p_apply[1]),
-                A.ShiftScaleRotate(
-                    shift_limit=0.1, 
-                    scale_limit=0.1, 
-                    rotate_limit=15, 
-                    p=p_apply[2]
-                ),
-                A.ZoomBlur(
-                    max_factor=1.11,
-                    p = p_apply[3]
-                ),
-                A.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
+                
+                # A.Resize(height=self.resized_height_v, width=self.resized_width_v),
+                # A.GaussianBlur(
+                #     sigma_limit=(0.2, 0.6),
+                #     p=p_apply[0]
+                # ),  # Gaussian blur with 10% probability
+                # A.OneOf([
+                #     A.RandomBrightnessContrast(
+                #         brightness_limit=0.15,
+                #         contrast_limit=0.15,
+                #         p = 0.5,
+                #     ),# Random brightness and contrast adjustments with 20% probability
+                #     A.ColorJitter(
+                #         brightness=0, contrast=0, saturation=0, hue=0.1,
+                #         p = 0.5
+                #     ),
+                # ], p=p_apply[1]),
+                # A.ShiftScaleRotate(
+                #     shift_limit=0.1, 
+                #     scale_limit=0.1, 
+                #     rotate_limit=15, 
+                #     p=p_apply[2]
+                # ),
+                # A.ZoomBlur(
+                #     max_factor=1.11,
+                #     p = p_apply[3]
+                # ),
+                
+                A.Normalize(mean=0.485,
+                                 std=0.229, max_pixel_value= 1.0),
+                # A.Normalize(mean=[0.485, 0.456, 0.406],
+                #                  std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
                 ToTensorV2(),
             ], additional_targets= {
                 f'image{i}': 'image' for i in range(self.num_stack)})
 
         else:
             self.transform_cam = A.Compose([
-                A.Resize(height=self.resized_height_v, width=self.resized_width_v),
-                A.Normalize(
-                    # mean=0.5,
-                    # std=0.5,
-                    mean=[0.485, 0.456, 0.406],
-                    std=[0.229, 0.224, 0.225], 
-                    max_pixel_value= 1.0
-                ),
+                # A.Resize(height=self.resized_height_v, width=self.resized_width_v),
+                
+                A.Normalize(mean=0.485,
+                                 std=0.229, max_pixel_value= 1.0),
+                # A.Normalize(
+                #     # mean=0.5,
+                #     # std=0.5,
+                #     mean=[0.485, 0.456, 0.406],
+                #     std=[0.229, 0.224, 0.225], 
+                #     max_pixel_value= 1.0
+                # ),
                 ToTensorV2(),
             ])
 
@@ -146,6 +154,8 @@ class ImitationEpisode(Dataset):
     def load_image(self, idx):
         img_path = self.image_paths[idx]
         image = np.array(Image.open(img_path)).astype(np.float32) / 255.0 # RGB FORMAT ONLY
+        # convert to grayscale
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         
         return image
     
@@ -362,7 +372,7 @@ class ImitationEpisode(Dataset):
 
         
 
-
+        # print(cam_gripper_framestack.shape)
         return (
             (cam_gripper_framestack,
             mel),

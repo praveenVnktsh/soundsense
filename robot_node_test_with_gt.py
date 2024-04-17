@@ -242,7 +242,7 @@ class RobotNode:
 
         video = video[-self.n_stack_images:]
         # video = [(img)/ 255.0 for img in video]
-        video = [(img).astype(np.float32)/ 255.0 for img in video]
+        # video = [(img).astype(np.float32)/ 255.0 for img in video]
         print("video shape", type(video[0]), video[0].shape, len(video))
         return {
             'video' : video, # list of images

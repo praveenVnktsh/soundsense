@@ -116,6 +116,29 @@ class ASTEncoder(nn.Module):
         if self.fc is not None:
             x = self.fc(x)
         return x
+    
+
+class HubertEncoder(nn.Module):
+    def __init__(self, out_dim=None):
+        super().__init__()
+        self.processor = AutoProcessor.from_pretrained("ntu-spml/distilhubert")
+        self.model = ASTModel.from_pretrained("ntu-spml/distilhubert")
+        # self.config = ASTConfig()
+        self.sr = 16000 # Hardcoded
+        self.fc = None
+        if out_dim is not None:
+            self.fc = nn.Linear(1214*768, out_dim) # Adds 1.5B params
+
+    def forward(self, audio):
+        # audio file is decoded on the fly
+        inputs = self.processor(audio.cpu().numpy().squeeze(1), sampling_rate=self.sr, return_tensors="pt").to(self.model.device)
+        with torch.no_grad(): # finetune all layers?
+            outputs = self.model(**inputs)
+        x = outputs.last_hidden_state
+        x = torch.flatten(x, 1)
+        if self.fc is not None:
+            x = self.fc(x)
+        return x
 
 def make_vision_encoder(out_dim=None):
     vision_extractor = resnet18(weights = torchvision.models.ResNet18_Weights.DEFAULT)

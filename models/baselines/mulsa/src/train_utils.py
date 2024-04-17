@@ -28,7 +28,6 @@ def start_training(config, exp_dir, pl_module, monitor="val/loss"):
     print("DIRPATH==", dirpath)
     checkpoint = ModelCheckpoint(
         dirpath=dirpath,
-        filename=exp_time ,
         save_top_k=4,
         save_last=True,
         monitor=monitor,

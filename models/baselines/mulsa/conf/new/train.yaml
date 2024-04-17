@@ -1,14 +1,14 @@
 # image 
 fps: 10 #capture image fps
-resized_height_v: 75
-resized_width_v: 100
+resized_height_v: 100
+resized_width_v: 75
 
 sample_rate_audio: 48000
 resample_rate_audio: 16000
 audio_len: 3 #audio length in seconds
 
 # dataset
-dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data'
+dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized'
 train_val_split: 0.85
 
 # model params
@@ -18,16 +18,17 @@ action_dim: 11
 num_stack: 6
 num_heads: 8
 norm_audio: True
+lstm_hidden_layers: 2
 
 
-output_sequence_length: 30 # roughly 3 seconds
-action_history_length: 0  
+# output_sequence_length: 30 # roughly 3 seconds
+action_history_length: 0
 
 # training params
 num_workers: 16
 batch_size: 32
 
-lr: 0.00005
+lr: 0.0005
 gamma: 0.9
 period: 3
 epochs: 200
@@ -35,7 +36,7 @@ resume: False
 log_dir: '/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/'
 
 # use_mha: False
-# decoder_type: "aux" # ["seq_pred", "layered", "multi_head", "aux"]
+# decoder_type: "lstm" # ["lstm", "layered", "multi_head", "simple"]
 # modalities: vg_ag #vg or vg_ag
 # exp_name: 'mulsa_cnn_audio_full_task'
 

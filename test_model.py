@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 # import rospy
 import time
@@ -50,10 +51,12 @@ if __name__ == "__main__":
 
     model.eval()
 
+    run_id = sys.argv[1]
     robot = RobotNode(
         config_path = model_root + "hparams.yaml",
         model = model, 
-        testing = True
+        testing = True,
+        run_id = run_id,
     )
 
     robot.run_loop(True)

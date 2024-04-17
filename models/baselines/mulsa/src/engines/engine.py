@@ -19,7 +19,22 @@ class ImiEngine(LightningModule):
         self.scheduler = scheduler
         self.config = config
 
-        self.loss_cce = torch.nn.CrossEntropyLoss(reduction='mean')
+        self.loss_cce = torch.nn.CrossEntropyLoss(
+            reduction='mean',
+            weight= torch.tensor([
+                0.06478152024111762, 
+                0.06246989835134276, 
+                0.09888640613718172, 
+                0.10121771630151609, 
+                0.09929480263829896, 
+                0.12452994585024232, 
+                0.13838784465936368, 
+                0.13897445980050166, 
+                0.07656873103658211, 
+                0.07574852408786006, 
+                0.019140150895993087
+            ]) 
+        )
         self.validation_step_outputs = []
 
         self.wrong = 1
@@ -34,21 +49,22 @@ class ImiEngine(LightningModule):
     def compute_loss(self, xyz_gt, xyz_pred):
         
         gt_future_actions, past_actions = xyz_gt # both are [batch_size, seq_len, action_dim]
-        B, Fl, _ = gt_future_actions.size()
+        B, sl, _ = gt_future_actions.size()
 
         # xyz_pred = [B, Seq, Action_dim]
 
-        if self.decoder_type == 'simple':
-            gt_future_actions = gt_future_actions.view(B, -1)
-            pred_future_actions = xyz_pred.view(B, -1)
-            loss = self.loss_cce(pred_future_actions, gt_future_actions)
+        # if self.decoder_type == 'simple':
+        #     gt_future_actions = gt_future_actions.view(B, -1)
+        #     pred_future_actions = xyz_pred.view(B, -1)
+        #     loss = self.loss_cce(pred_future_actions, gt_future_actions)
 
 
-        if self.decoder_type in ["layered", 'multi_head', 'lstm']:    
-            loss = 0
-            for i in range(gt_future_actions.size(1)):
-                loss += self.loss_cce(xyz_pred[:, i, :], gt_future_actions[:, i, :])
-            loss /= gt_future_actions.size(1)
+        # if self.decoder_type in ["layered", 'multi_head', 'lstm']:    
+        
+        loss = 0
+        for i in range(gt_future_actions.size(1)):
+            loss += self.loss_cce(xyz_pred[:, i, :], gt_future_actions[:, i, :])
+        # loss /= sl
         
         return loss
 
