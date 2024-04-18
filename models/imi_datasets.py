@@ -30,14 +30,6 @@ class ImitationEpisode(Dataset):
         # self.logs = pd.read_csv(log_file)
         self.run_id = run_id
         self.sample_rate_audio = 48000 ##TODO
-        # self.mel = torchaudio.transforms.MelSpectrogram(
-        #     sample_rate=self.sample_rate_audio,
-        #     n_fft=int(self.sample_rate_audio * 0.025),
-        #     hop_length=int(self.sample_rate_audio * 0.01),
-        #     n_mels=64,
-        #     center=False, # why?
-        # )
-        
         self.fps = config["fps"]
         self.audio_len = config['audio_len']
         self.sample_rate_audio = config["sample_rate_audio"]
@@ -116,10 +108,10 @@ class ImitationEpisode(Dataset):
                 #     p = p_apply[3]
                 # ),
                 
-                A.Normalize(mean=0.485,
-                                 std=0.229, max_pixel_value= 1.0),
-                # A.Normalize(mean=[0.485, 0.456, 0.406],
-                #                  std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
+                # A.Normalize(mean=0.485,
+                #                  std=0.229, max_pixel_value= 1.0),
+                A.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
                 ToTensorV2(),
             ], additional_targets= {
                 f'image{i}': 'image' for i in range(self.num_stack)})
@@ -154,9 +146,6 @@ class ImitationEpisode(Dataset):
     def load_image(self, idx):
         img_path = self.image_paths[idx]
         image = np.array(Image.open(img_path)).astype(np.float32) / 255.0 # RGB FORMAT ONLY
-        # convert to grayscale
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-        
         return image
     
     def clip_resample(self, audio, audio_start, audio_end):
@@ -403,12 +392,12 @@ if __name__ == "__main__":
             'history_encoder_dim': 32,
             'output_sequence_length' : 1,
             'action_history_length': 0,
-            # 'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data',
-            'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
+            'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_sanity',
+            # 'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
             'num_stack': 6,
             'norm_audio' : True
         },
-        run_id = "0",
+        run_id = "129",
         train=True
     )
     print("Dataset size", len(dataset))

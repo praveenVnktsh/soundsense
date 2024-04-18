@@ -47,7 +47,7 @@ class RobotNode:
             )
         self.idx = 0
         self.model = model
-        self.images = sorted(glob.glob(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/{run_id}/video/*.png'))
+        self.images = sorted(glob.glob(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized/{run_id}/video/*.png'))
         # self.images = sorted(glob.glob(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/video/*.png'))
     
     def clip_resample(self, audio, audio_start, audio_end):
@@ -99,9 +99,11 @@ class RobotNode:
         print("idx", self.idx)
         path = self.images[self.idx]
         frame = cv2.imread(path)
-        frame = cv2.resize(frame, (h, w))
+        frame = cv2.resize(frame, (w, h))
+        frame = np.array(frame).astype(np.float32) / 255.0 
         # frame = np.random.randint(0, 255, (h, w, 3)).astype(np.uint8)
         # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         ## same frames
         cv2.imwrite(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{self.run_id}/video/frame_{self.idx}.jpg', frame)
         return frame
@@ -141,11 +143,11 @@ class RobotNode:
                     self.history['audio'] = np.array([0] * pad_length + self.total_audio[:audio_end].tolist())
                 else:
                     self.history['audio'] = self.total_audio[audio_start:audio_end]
-                try:
-                    hist_actions = self.execute_action(hist_actions)
-                except Exception as e:
-                    print("Error in execute action", e)
-                    is_run = False
+                # try:
+                hist_actions = self.execute_action(hist_actions)
+                # except Exception as e:
+                #     print("Error in execute action", e)
+                #     is_run = False
                 # time.sleep(0.1)
         filepath = f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{self.run_id}/actions.txt'
         np.savetxt(filepath, hist_actions, fmt='%s')
@@ -159,6 +161,7 @@ class RobotNode:
         inputs = self.generate_inputs(False)
         # with torch.no_grad():
         print("inputs", inputs['video'][0].shape)
+        # print(inputs["video"][0].max(), inputs["video"][0].min(), inputs["video"][0].mean())
         outputs = self.model(inputs).squeeze() # 11 dimensional
         print("model output shape", outputs.shape)
         outputs = outputs[0] # take 0th action from sequence predicted
@@ -242,7 +245,7 @@ class RobotNode:
 
         video = video[-self.n_stack_images:]
         # video = [(img)/ 255.0 for img in video]
-        # video = [(img).astype(np.float32)/ 255.0 for img in video]
+        video = [(img).astype(np.float32)/ 255.0 for img in video]
         print("video shape", type(video[0]), video[0].shape, len(video))
         return {
             'video' : video, # list of images

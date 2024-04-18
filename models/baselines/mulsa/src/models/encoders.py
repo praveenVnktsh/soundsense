@@ -9,7 +9,7 @@ from torchvision.models.feature_extraction import (
 import torch
 from torch import nn
 import torchvision
-from transformers import AutoProcessor, ASTModel, ASTConfig
+from transformers import AutoProcessor, ASTModel, AutoModel
 # from perceiver_pytorch import Perceiver
 import torch.nn.functional as F
 import torchaudio
@@ -117,12 +117,34 @@ class ASTEncoder(nn.Module):
             x = self.fc(x)
         return x
 
+class HubertEncoder(nn.Module):
+    def __init__(self, out_dim=None):
+        super().__init__()
+        self.processor = AutoProcessor.from_pretrained("ntu-spml/distilhubert")
+        self.model = AutoModel.from_pretrained("ntu-spml/distilhubert")
+        # self.config = ASTConfig()
+        self.sr = 16000 # Hardcoded
+        self.fc = None
+        if out_dim is not None:
+            self.fc = nn.Linear(1214*768, out_dim) # Adds 1.5B params
+
+    def forward(self, audio):
+        # audio file is decoded on the fly
+        inputs = self.processor(audio.cpu().numpy().squeeze(1), sampling_rate=self.sr, return_tensors="pt").to(self.model.device)
+        with torch.no_grad(): # finetune all layers?
+            outputs = self.model(**inputs)
+        x = outputs.last_hidden_state
+        print("last hidden state", x.shape)
+        x = torch.flatten(x, 1)
+        print("after flatten", x.shape)
+        if self.fc is not None:
+            x = self.fc(x)
+        return x
+
 def make_vision_encoder(out_dim=None):
     vision_extractor = resnet18(weights = torchvision.models.ResNet18_Weights.DEFAULT)
-    print(vision_extractor)
-    
     vision_extractor.conv1 = nn.Conv2d(
-        3, 64, kernel_size=7, stride=1, padding=3, bias=False
+        5, 64, kernel_size=7, stride=1, padding=3, bias=False
     )
     vision_extractor = create_feature_extractor(vision_extractor, ["layer4.1.relu_1"])
     # return Vision_Encoder(vision_extractor, out_dim)
@@ -149,6 +171,8 @@ def make_audio_encoder(out_dim=None, norm_audio=False, model="spec"):
         return Spec_Encoder(audio_extractor, out_dim, norm_audio)
     elif model == "ast":
         return ASTEncoder(out_dim)
+    elif model == "hubert":
+        return HubertEncoder(out_dim)    
 
 
 if __name__ == "__main__":
@@ -163,6 +187,7 @@ if __name__ == "__main__":
     # audio_gripper = [
     #     x for x in audio_gripper1 if x is not None
     # ]
+    
     # audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
     # audio_gripper = (audio_gripper).reshape(1,-1)
     # audio_clip = clip_resample(audio_gripper, 0, 3*48000)

@@ -121,13 +121,13 @@ class ImiEngine(LightningModule):
     #     acc = numerator / divider
     #     self.log("val/acc", acc, on_step=False, on_epoch=True)
 
+    def val_dataloader(self):
+        """Validation dataloader"""
+        return self.val_loader
     def train_dataloader(self):
         """Training dataloader"""
         return self.train_loader
 
-    def val_dataloader(self):
-        """Validation dataloader"""
-        return self.val_loader
 
     def configure_optimizers(self):
         return [self.optimizer], [self.scheduler]

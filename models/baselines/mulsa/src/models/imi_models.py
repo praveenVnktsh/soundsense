@@ -54,9 +54,7 @@ class Actor(torch.nn.Module):
             )
         else:
             self.decoder_bottleneck = nn.Sequential(
-                nn.Linear(self.layernorm_embed_shape, self.layernorm_embed_shape//2),
-                nn.ReLU(),
-                nn.Linear(self.layernorm_embed_shape//2, self.layernorm_embed_shape//4),
+                nn.Linear(self.layernorm_embed_shape, self.layernorm_embed_shape//4),
                 nn.ReLU(),
                 nn.Linear(self.layernorm_embed_shape//4, self.action_dim),
                 nn.ReLU()
@@ -64,11 +62,15 @@ class Actor(torch.nn.Module):
 
         if self.decoder_type == "layered" or self.decoder_type == "multi_head":
             print("Creating layered decoder")
-            self.decoder = [
-                nn.Sequential(nn.Linear(self.action_dim, self.action_dim), nn.Tanh()).to(self.device)
-                for i in range(config["output_sequence_length"])
-            ]
-            self.decoder = nn.ModuleList(self.decoder)
+            self.decoder = nn.Sequential(
+                nn.Linear(self.action_dim, self.action_dim),
+                nn.Tanh(),
+            ).to(self.device)
+            # self.decoder = [
+            #     nn.Sequential(nn.Linear(self.action_dim, self.action_dim)).to(self.device)
+            #     for i in range(config["output_sequence_length"])
+            # ]
+            # self.decoder = nn.ModuleList(self.decoder)
         if self.decoder_type == 'lstm':
             print("Creating LSTM decoder")
             self.lstm_hidden_layers = config['lstm_hidden_layers']
@@ -95,13 +97,14 @@ class Actor(torch.nn.Module):
             a_inp: [batch, 1, T]
         """
         vg_inp, audio_g = inputs
+        # print("vg_inp shape", vg_inp.shape)
         
         # encoders
         embeds = []
         if "vg" in self.modalities:
             batch, num_stack, _, Hv, Wv = vg_inp.shape
             # print(vg_inp.shape,batch * num_stack, 3, Hv, Wv )
-            vg_inp = vg_inp.view(batch * num_stack, 1, Hv, Wv)
+            vg_inp = vg_inp.view(batch * num_stack, 3, Hv, Wv)
             # print(vg_inp.dtype, vg_inp.shape)
             vg_embeds = self.v_encoder(vg_inp)  # [batch * num_stack, encoder_dim]
             vg_embeds = vg_embeds.view(
@@ -142,11 +145,19 @@ class Actor(torch.nn.Module):
         else:
             pred = self.decoder_bottleneck(mlp_inp).to(self.device) # the bottleneck
             if self.decoder_type == "layered":
-                out = torch.tensor([]).to(self.device)
-                for i in range(len(self.decoder)):
-                    pred = self.decoder[i](pred)
-                    out = torch.cat((out, pred.unsqueeze(1)), dim=1)
-
+                # out = torch.tensor([]).to(self.device)
+                # for i in range(self.output_sequence_length):
+                #     pred = self.decoder[i](pred)
+                #     out = torch.cat((out, pred.unsqueeze(1)), dim=1)
+                outs = []
+                hidden = torch.zeros_like(pred)
+                
+                for i in range(self.output_sequence_length):
+                    pred = self.decoder(pred)
+                    # out = torch.cat((out, pred.unsqueeze(1)), dim=1)
+                    outs.append(pred.clone())
+                out = torch.stack(outs, dim=1) # [batch, stack_future_actions_dim, action_dim]
+                # print(out.shape)
             elif self.decoder_type == "multi_head":
                 out = torch.tensor([]).to(self.device)
                 

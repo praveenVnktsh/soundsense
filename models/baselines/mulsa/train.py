@@ -36,9 +36,10 @@ def main(config):
     run_ids = os.listdir(config['dataset_root'])
     np.random.permutation(run_ids)
     split = int(config['train_val_split']*len(run_ids))
-    train_episodes = run_ids[:split]
-    val_episodes = run_ids[split:]
-
+    # train_episodes = run_ids[:split]
+    # val_episodes = run_ids[split:]
+    train_episodes = run_ids
+    val_episodes = run_ids
     # train_episodes = run_ids[:3]
     # val_episodes = run_ids[:1]
 
@@ -74,8 +75,11 @@ def main(config):
     # save config
     # exp_dir = save_config(config)
 
+    # pl_module = ImiEngine(
+    #     imi_model, optimizer, train_loader, val_loader, scheduler, config
+    # )
     pl_module = ImiEngine(
-        imi_model, optimizer, train_loader, val_loader, scheduler, config
+        imi_model, optimizer, train_loader, train_loader, scheduler, config
     )
     start_training(config, config['log_dir'], pl_module)
 
@@ -92,7 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_audio", action='store_true', help="Use audio")
     parser.add_argument('--output_sequence_length', type=int, required=True, help='Output sequence length')
     parser.add_argument('--audio_len', type=int, help='Output sequence length')
-    parser.add_argument('--audio_encoder', type=str, default='spec', help='Audio encoder', choices=['spec', 'ast'])
+    parser.add_argument('--audio_encoder', type=str, default='spec', help='Audio encoder', choices=['spec', 'ast', 'hubert'])
     args = parser.parse_args()
     
 
