@@ -29,10 +29,15 @@ class Actor(torch.nn.Module):
         self.query = nn.Parameter(torch.randn(1, 1, self.layernorm_embed_shape))
         self.embed_dim = self.layernorm_embed_shape * len(self.modalities)
         
-        self.layernorm = nn.LayerNorm(self.layernorm_embed_shape)
-        self.encoder_bottleneck = nn.Linear(
-            self.embed_dim, self.layernorm_embed_shape
-        ) 
+        self.encoder_bottleneck = nn.Sequential(
+            nn.Linear(self.embed_dim, self.layernorm_embed_shape),
+            nn.LayerNorm(self.layernorm_embed_shape),
+            nn.ReLU(),
+            nn.Linear(self.layernorm_embed_shape, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU()
+        )
 
         if self.use_mha:
             self.mha = MultiheadAttention(self.layernorm_embed_shape, config["num_heads"])
@@ -52,15 +57,12 @@ class Actor(torch.nn.Module):
                 nn.ReLU(),
                 nn.Linear(self.layernorm_embed_shape//2, self.output_sequence_length * self.action_dim)
             )
-        else:
+
+        if self.decoder_type == "layered" or self.decoder_type == "multi_head":
             self.decoder_bottleneck = nn.Sequential(
                 nn.Linear(self.layernorm_embed_shape, self.layernorm_embed_shape//4),
                 nn.ReLU(),
-                nn.Linear(self.layernorm_embed_shape//4, self.action_dim),
-                nn.ReLU()
             )
-
-        if self.decoder_type == "layered" or self.decoder_type == "multi_head":
             print("Creating layered decoder")
             self.decoder = nn.Sequential(
                 nn.Linear(self.action_dim, self.action_dim),
@@ -75,11 +77,16 @@ class Actor(torch.nn.Module):
             print("Creating LSTM decoder")
             self.lstm_hidden_layers = config['lstm_hidden_layers']
             self.decoder = nn.LSTM(
-                self.action_dim, 
-                self.action_dim, 
+                256, 
+                256, 
                 num_layers=self.lstm_hidden_layers, 
                 batch_first=True
             )
+            self.output_head = nn.Linear(256, self.action_dim)
+            # self.decoder_mlp = nn.Sequential(
+            #     nn.Linear(self.layernorm_embed_shape//4, self.action_dim),
+            #     nn.Tanh()
+            # )
             # self.input_past_actions_dim = config["input_past_actions_dim"]
             # self.history_encoder_dim = config["history_encoder_dim"]
             # self.history_mlp = [nn.Sequential(nn.Linear(self.input_past_actions_dim*self.action_dim, self.history_encoder_dim), nn.Tanh()).to(self.device)] + \
@@ -123,32 +130,25 @@ class Actor(torch.nn.Module):
             # query = self.query.repeat(1, batch, 1) # [1, 1, D] -> [1, batch, D]
             # change back to 3*3
             mha_out, weights = self.mha(mlp_inp, mlp_inp, mlp_inp, average_attn_weights=False)  # [1, batch, D]
-            # print("weights inside model:",weights.shape, weights)
             # weights.shape(1,8,1,1)
             mha_out += mlp_inp
             mlp_inp = torch.concat([mha_out[i] for i in range(mha_out.shape[0])], 1)
-            # print("mha_out", mha_out.shape, "mlp_inp:", mlp_inp.shape)
-            mlp_inp = self.encoder_bottleneck(mlp_inp)
-            # mlp_inp = mha_out.squeeze(0) # [batch, D]
         else:
             mlp_inp = torch.cat(embeds, dim=-1)
-            # print(mlp_inp.shape)
-            mlp_inp = self.encoder_bottleneck(mlp_inp)
             weights = None
 
-        # apply layernorm.
-        mlp_inp = self.layernorm(mlp_inp)
+        mlp_inp = self.encoder_bottleneck(mlp_inp)
 
         if self.decoder_type == "simple":
             out = self.decoder(mlp_inp)
             out = out.view(-1, self.output_sequence_length, self.action_dim)
         else:
-            pred = self.decoder_bottleneck(mlp_inp).to(self.device) # the bottleneck
             if self.decoder_type == "layered":
                 # out = torch.tensor([]).to(self.device)
                 # for i in range(self.output_sequence_length):
                 #     pred = self.decoder[i](pred)
                 #     out = torch.cat((out, pred.unsqueeze(1)), dim=1)
+                pred = self.decoder_bottleneck(mlp_inp).to(self.device) # the bottleneck
                 outs = []
                 hidden = torch.zeros_like(pred)
                 
@@ -159,23 +159,24 @@ class Actor(torch.nn.Module):
                 out = torch.stack(outs, dim=1) # [batch, stack_future_actions_dim, action_dim]
                 # print(out.shape)
             elif self.decoder_type == "multi_head":
+                pred = self.decoder_bottleneck(mlp_inp).to(self.device) # the bottleneck
                 out = torch.tensor([]).to(self.device)
                 
                 for i in range(len(self.decoder)):
                     # outs.append(self.decoder[i](pred))
                     out = torch.cat((out, pred.unsqueeze(1)), dim=1)
                 # out = torch.stack(outs, dim=1) # [batch, stack_future_actions_dim, action_dim]
-
             elif self.decoder_type == "lstm":
                 batch_size = mlp_inp.shape[0]
-                h0 = torch.zeros(self.lstm_hidden_layers, batch_size, self.action_dim).to(self.device)
-                c0 = torch.zeros(self.lstm_hidden_layers, batch_size, self.action_dim).to(self.device)
+                h0 = torch.zeros(self.lstm_hidden_layers, batch_size, 256).to(self.device)
+                c0 = torch.zeros(self.lstm_hidden_layers, batch_size, 256).to(self.device)
                 out = torch.tensor([]).to(self.device)
-                pred = pred.unsqueeze(1)
+                pred = mlp_inp.unsqueeze(1)
                 for t in range(self.output_sequence_length):
-                    pred, (h0, c0) = self.decoder(pred, (h0, c0))  
-                    out = torch.cat((out, pred), dim=1)
+                    pred, (h0, c0) = self.decoder(pred, (h0, c0)) # operating like a world model.
 
+                    out = torch.cat((out, self.output_head(pred.unsqueeze(1))), dim=1)
+                out = out.squeeze(2)
         return out, weights, mlp_inp
 
     
