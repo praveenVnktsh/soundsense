@@ -32,6 +32,7 @@ def start_training(config, exp_dir, pl_module, monitor="val/loss"):
         save_last=True,
         monitor=monitor,
         mode="min",
+        every_n_epochs = 50,
     )
 
     logger = TensorBoardLogger(
