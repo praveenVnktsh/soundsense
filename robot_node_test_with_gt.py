@@ -32,9 +32,9 @@ class RobotNode:
             'audio': [0] * self.hz * self.audio_n_seconds,
             'video': [],
         }
-        self.run_id = '129'
+        self.run_id = '20'
         if not is_unimodal:
-            data = sf.read(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/{self.run_id}/processed_audio.wav')[0]
+            data = sf.read(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized/{self.run_id}/processed_audio.wav')[0]
             # data = sf.read(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/processed_audio.wav')[0]
             self.total_audio = torchaudio.functional.resample(torch.tensor(data), 48000, 16000).numpy()
             self.mel = torchaudio.transforms.MelSpectrogram(
@@ -224,25 +224,16 @@ class RobotNode:
             if self.use_audio:
                 import matplotlib.pyplot as plt
                 temp = mel.squeeze().numpy()
-                temp -= -15
-                temp /= 30
-                temp *= 255
-                temp = temp.astype(np.uint8)
-                temp = cv2.resize(temp, (0, 0), fx = 3, fy = 3)
-                temp = cv2.flip(temp, 0)
-                t = np.linspace(0, (audio.numel()) / self.hz, audio.numel())
-                # plt.ion()
-                # plt.cla()
-                # plt.plot(t, audio.numpy().squeeze(), color='b')
-                # plt.ylim(-1, 1)
-                # plt.show()
-
-                # cv2.imshow('mel', temp)
-                # if cv2.waitKey(1) == ord('q'):
-                #     exit()
-                # plt.ion()
-                # plt.imshow(mel.squeeze().numpy(), cmap = 'viridis',origin='lower',)
-                # plt.show()
+                # print("Min max", temp.min(), temp.max())
+                # np.save(f'models/temp/{self.idx}.npy', temp)
+                # exit()
+                temp -= temp.min()
+                temp /= temp.max()
+                temp = cv2.resize(temp, self.stacked.shape[:2][::-1])
+                temp = (temp * 255).astype(np.uint8)
+                temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
+                print(temp.shape, self.stacked.shape)
+                self.stacked = np.vstack([self.stacked, temp])
 
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]

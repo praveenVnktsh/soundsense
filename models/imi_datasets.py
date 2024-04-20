@@ -29,7 +29,6 @@ class ImitationEpisode(Dataset):
         super().__init__()
         # self.logs = pd.read_csv(log_file)
         self.run_id = run_id
-        self.sample_rate_audio = 48000 ##TODO
         self.fps = config["fps"]
         self.audio_len = config['audio_len']
         self.sample_rate_audio = config["sample_rate_audio"]
@@ -392,16 +391,17 @@ if __name__ == "__main__":
             'history_encoder_dim': 32,
             'output_sequence_length' : 1,
             'action_history_length': 0,
-            'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_sanity',
+            'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized',
             # 'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
             'num_stack': 6,
             'norm_audio' : True
         },
-        run_id = "129",
+        run_id = "20",
         train=True
     )
     print("Dataset size", len(dataset))
-    i = 120
+    i = 18
+    print("Index", i)
     (cam_gripper_framestack, mel_spec), (xyzgt, frame_idx) = dataset[i]
     # save images
     stacked = []
@@ -414,5 +414,15 @@ if __name__ == "__main__":
         img = np.clip(img, 0, 1)
         stacked.append(img.copy())
     stacked = np.hstack(stacked)
-    plt.imsave('temp/melspec.png', mel_spec[0].numpy(), cmap='viridis', origin='lower', )
-    plt.imsave(f'temp/0.png', stacked)
+    mel = mel_spec[0].numpy()
+    
+    mel = cv2.resize(mel, stacked.shape[:2][::-1])
+    mel -= mel.min()
+    mel /= mel.max()
+    mel = cv2.applyColorMap((mel * 255).astype(np.uint8), cv2.COLORMAP_VIRIDIS)
+    stacked = (stacked * 255).astype(np.uint8)    
+    viz = np.vstack([stacked, mel])
+    # plt.imsave('temp/viz.png', viz)
+    cv2.imwrite('temp/viz.png', viz)
+    # plt.imsave('temp/melspec.png', mel_spec[0].numpy(), cmap='viridis', origin='lower', )
+    # plt.imsave(f'temp/0.png', stacked)

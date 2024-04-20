@@ -47,7 +47,19 @@ class RobotNode:
         self.cap  = cv2.VideoCapture(cam)
         self.model = model
 
-        
+        self.seq_len = 10
+        self.output_dim = 11
+        self.temp_ensemble = True
+
+        idx = [0]
+        for i in range(1, self.seq_len):
+            idx.append(idx[-1] + i)
+        self.idx = np.array(idx)
+
+        self.weights = np.array([np.exp(-self.m*i) for i in range(self.seq_len)])
+
+        self.temporal_ensemble_arr = np.zeros(((self.seq_len - 1)*(self.seq_len - 2)/2, self.output_dim))
+
     
     def callback(self, data):
         audio = np.frombuffer(data.data, dtype=np.int16).copy().astype(np.float64)
@@ -202,7 +214,18 @@ class RobotNode:
         starttime = time.time()
         outputs = self.model(inputs) # 11 dimensional
         print("Time to run model: ", time.time() - starttime)
-        outputs = torch.nn.functional.softmax(outputs)
+        if self.temp_ensemble:
+            outputs = outputs.squeeze(0)
+            self.temporal_ensemble_arr = np.stack([self.temporal_ensemble_arr, outputs], axis = 0)
+            
+            print("TE SHAPE: ", self.temporal_ensemble_arr.shape)
+            values = self.temporal_ensemble_arr[self.idx, :]
+            outputs = np.mean(values * self.weights, axis = 0)
+            print("OUTPUTS: ", outputs)
+            print(outputs.shape)
+            self.temporal_ensemble_arr = np.delete(self.temporal_ensemble_arr, self.idx)
+        else:
+            outputs = torch.nn.functional.softmax(outputs.squeeze(0)[0])
         # w - extend arm
         # s - retract arm
         # a - move left
