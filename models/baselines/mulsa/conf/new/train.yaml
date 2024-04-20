@@ -8,7 +8,7 @@ resample_rate_audio: 16000
 audio_len: 3 #audio length in seconds
 
 # dataset
-dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_sanity'
+dataset_root: '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized'
 train_val_split: 0.85
 
 # model params
@@ -31,7 +31,7 @@ batch_size: 32
 lr: 0.0001
 period: 10
 gamma: 0.9
-epochs: 200
+epochs: 500
 resume: False
 log_dir: '/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/'
 
