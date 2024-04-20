@@ -25,57 +25,34 @@ class MULSAInference(pl.LightningModule):
         self.use_audio = "ag" in self.config["modalities"].split("_")
         self.actor = Actor(v_encoder, a_encoder, self.config)
         self.loss_cce = torch.nn.CrossEntropyLoss(weight= torch.tensor([1]*11))
-        # self.transform_image = transforms.Compose([
-        #     # transforms.ToPILImage(), ## why do need this transformation?
-        #     # transforms.Resize((self.config['resized_width_v'], self.co    nfig['resized_height_v'])),
-        #     # transforms.Resize((self.config['resized_height_v'], self.config['resized_width_v'])),
-        #     transforms.ToTensor(),
-        #     transforms.Normalize(mean=0.485,
-        #             std=0.229,),
-        # ])
-        self.transform_image = A.Compose([
-            A.Normalize(mean=0.485, std=0.229, max_pixel_value=1.0),
-            ToTensorV2(),])
-        # self.transform_image = A.Compose([                A.Normalize(mean=0.485,
-        #                          std=0.229, max_pixel_value= 1.0),
-        #         # A.Normalize(mean=[0.485, 0.456, 0.406],
-        #         #                  std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
-        #         ToTensorV2(),
-        #     ], additional_targets= {
-        #         f'image{i}': 'image' for i in range(self.num_stack)})
-        # self.transform_image = transforms.Compose([
-        #     transforms.ToPILImage(), ## why do need this transformation?
-        #     transforms.Resize((self.config['resized_height_v'], self.config['resized_width_v'])),
-        #     transforms.ToTensor(),
-        #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-        #             std=[0.229, 0.224, 0.225], ),
-        # ])
-        
-        # self.transform_cam = A.Compose([
-        #         A.Resize(height=self.resized_height_v, width=self.resized_width_v),
-        #         A.Normalize(
-        #             # mean=0.5,
-        #             # std=0.5,
-                    # mean=[0.485, 0.456, 0.406],
-                    # std=[0.229, 0.224, 0.225], 
-        #             max_pixel_value= 1.0
-        #         ),
-        #         ToTensorV2(),
-        #     ])
+        self.num_stack = self.config['num_stack']
+        print("NUM STACK: ", self.num_stack)
+        # self.transform_image = A.Compose([
+        #     A.Normalize(mean=0.485, std=0.229, max_pixel_value=1.0),
+        #     ToTensorV2(),])
+        # self.moddevi = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.transform_image = A.Compose([           
+                #  A.Normalize(mean=0.485,
+                #                  std=0.229, max_pixel_value= 1.0),
+                A.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
+                ToTensorV2(),
+            ]
+        )
 
     def forward(self, inp):
 
         video = inp["video"] #list of images
         # print(type(video[0]))
-        video = torch.stack([self.transform_image(image=img)['image'] for img in video], dim=0)
+        video = torch.stack([self.transform_image(image=img)['image'] for img in video], dim=0).to(self.device)
         video = video.unsqueeze(0)
+        # print(video.shape)
         
         if self.use_audio:
             audio = inp["audio"]
             x = video, audio
         else:
             x = video, None
-        print(x[0].shape)
         out = self.actor(x) # tuple of 3 tensors (main output, weights, prev layer output)
         return out[0]
     

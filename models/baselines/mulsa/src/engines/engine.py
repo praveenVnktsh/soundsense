@@ -33,7 +33,9 @@ class ImiEngine(LightningModule):
                 0.07656873103658211, 
                 0.07574852408786006, 
                 0.019140150895993087
-            ]) 
+                # 0,
+            ]),
+            # ignore_index=10
         )
         self.validation_step_outputs = []
 

@@ -10,9 +10,9 @@ import yaml
 import glob
 import soundfile as sf
 import torchaudio
-
+from PIL import Image
 class RobotNode:
-    def __init__(self, config_path, model, is_unimodal = False, testing = False, run_id='20'):
+    def __init__(self, config_path, model, is_unimodal = False, testing = False):
         # self.r = stretch_body.robot.Robot()
         # self.boot_robot()
         
@@ -26,17 +26,15 @@ class RobotNode:
         self.use_audio = "ag" in params['modalities'].split("_")
         self.norm_audio = params['norm_audio']
         print("Using audio:", self.use_audio)
-
+        self.stacked = None
         self.n_stack_images = params['num_stack']
         self.history = {
             'audio': [0] * self.hz * self.audio_n_seconds,
             'video': [],
         }
-        self.run_id = run_id
-        os.makedirs(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{run_id}', exist_ok = True)
-        os.makedirs(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{run_id}/video', exist_ok = True)
+        self.run_id = '129'
         if not is_unimodal:
-            data = sf.read(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/{run_id}/processed_audio.wav')[0]
+            data = sf.read(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/{self.run_id}/processed_audio.wav')[0]
             # data = sf.read(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/processed_audio.wav')[0]
             self.total_audio = torchaudio.functional.resample(torch.tensor(data), 48000, 16000).numpy()
             self.mel = torchaudio.transforms.MelSpectrogram(
@@ -47,9 +45,12 @@ class RobotNode:
             )
         self.idx = 0
         self.model = model
-        self.images = sorted(glob.glob(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized/{run_id}/video/*.png'))
+        self.output_sequence_length = params['output_sequence_length']
+        self.images = sorted(glob.glob(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized/{self.run_id}/video/*.png'))
         # self.images = sorted(glob.glob(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/video/*.png'))
-    
+        import json
+        with open(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/{self.run_id}/actions.json', 'r') as f:
+            self.gt_actions = np.array(json.load(f))
     def clip_resample(self, audio, audio_start, audio_end):
         left_pad, right_pad = torch.Tensor([]), torch.Tensor([])
         # print("au_size", audio.size())
@@ -96,16 +97,9 @@ class RobotNode:
         self.idx += 1
         if self.idx >= len(self.images):
             return None
-        print("idx", self.idx)
         path = self.images[self.idx]
-        frame = cv2.imread(path)
-        frame = cv2.resize(frame, (w, h))
-        frame = np.array(frame).astype(np.float32) / 255.0 
-        # frame = np.random.randint(0, 255, (h, w, 3)).astype(np.uint8)
-        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        ## same frames
-        cv2.imwrite(f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{self.run_id}/video/frame_{self.idx}.jpg', frame)
+        frame = np.asarray(Image.open(path)).astype(np.float32) / 255.0
+
         return frame
 
     def run_loop(self, visualize = False):
@@ -136,8 +130,8 @@ class RobotNode:
                 audio_end = int(self.idx * self.hz / loop_rate )
                 audio_start = audio_end - self.hz * self.audio_n_seconds
                 
-                print("audio_start", audio_start/self.hz, "audio_end", audio_end/self.hz, 'completion', audio_end/len(self.total_audio))
-                print("Frame time:", self.idx / loop_rate)
+                # print("audio_start", audio_start/self.hz, "audio_end", audio_end/self.hz, 'completion', audio_end/len(self.total_audio))
+                # print("Frame time:", self.idx / loop_rate)
                 if audio_start < 0:
                     pad_length = -audio_start
                     self.history['audio'] = np.array([0] * pad_length + self.total_audio[:audio_end].tolist())
@@ -158,14 +152,12 @@ class RobotNode:
         # action_space = [del_extension, del_height, del_lateral, del_roll, del_gripper]
         # action[0] = np.clip(action[0], -0.01, 0.01)
         
-        inputs = self.generate_inputs(False)
+        inputs = self.generate_inputs(True)
+        
         # with torch.no_grad():
-        print("inputs", inputs['video'][0].shape)
+        # print("inputs", inputs['video'][0].shape)
         # print(inputs["video"][0].max(), inputs["video"][0].min(), inputs["video"][0].mean())
-        outputs = self.model(inputs).squeeze() # 11 dimensional
-        print("model output shape", outputs.shape)
-        outputs = outputs[0] # take 0th action from sequence predicted
-        outputs = torch.nn.functional.softmax(outputs, dim = 0)
+        outputs = self.model(inputs).squeeze(0) # [b, seqlen, 11]
         mapping = {
             'w': 0, 
             's': 1,
@@ -180,13 +172,27 @@ class RobotNode:
             'none': 10,
         }
         inv_mapping = {v: k for k, v in mapping.items()}
+        # print("model output shape", outputs.shape)
+        actions = []
+        lengt = len(self.gt_actions)
+        gt_actions = self.gt_actions[self.idx : min(self.idx + self.output_sequence_length, lengt)].tolist()
+        for i in range(len(gt_actions)):
+            gt_actions[i] = inv_mapping[np.argmax(gt_actions[i])]
+            
+        for o in outputs:
+            oo = torch.nn.functional.softmax(o, dim = 0)
+            action_idx = torch.argmax(oo).item()
+            actions.append(inv_mapping[action_idx])
+            print(actions[-1], o)
+        # hist_actions.append(inv_mapping[action_idx])
 
-        action_idx = torch.argmax(outputs).item()
-        print("action: ", inv_mapping[action_idx], "output: ", outputs.cpu().detach().numpy().tolist())
-        hist_actions.append(inv_mapping[action_idx])
+        if self.stacked is not None:
+            self.stacked = (self.stacked * 255).astype(np.uint8)
+            cv2.putText(self.stacked, "pred:" + str(actions), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            cv2.putText(self.stacked, "gt:   " + str(gt_actions), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            cv2.imwrite(f'predicted/{self.idx}.png', self.stacked)
         return hist_actions
     def generate_inputs(self, save = True):
-        print("video shape", len(self.history['video']))
         video = self.history['video'].copy() # subsample n_frames of interest
         n_images = len(video)
         ## This is different then training?
@@ -202,18 +208,18 @@ class RobotNode:
             eps = 1e-8
             mel = np.log(mel + eps)
             
-            print((audio).numel() / self.hz)
-            print(audio.max(), audio.min(), audio.mean(), mel.max(), mel.min(), mel.mean())
+            # print((audio).numel() / self.hz)
+            # print(audio.max(), audio.min(), audio.mean(), mel.max(), mel.min(), mel.mean())
             if self.norm_audio:
                 mel /= mel.sum(dim = -2, keepdim = True)
-
+        # print(len(video))
         if save:
             stacked = np.hstack(video)
             # cv2.imwrite('stacked.jpg', stacked)
             stacked = cv2.resize(stacked,(0, 0), fx = 3, fy = 3)
-            cv2.imshow('stacked', stacked)
-            if cv2.waitKey(1) == ord('q'):
-                exit()
+            self.stacked = stacked
+            # if cv2.waitKey(1) == ord('q'):
+            #     exit()
 
             if self.use_audio:
                 import matplotlib.pyplot as plt
@@ -224,16 +230,16 @@ class RobotNode:
                 temp = temp.astype(np.uint8)
                 temp = cv2.resize(temp, (0, 0), fx = 3, fy = 3)
                 temp = cv2.flip(temp, 0)
-                plt.ion()
-                plt.cla()
                 t = np.linspace(0, (audio.numel()) / self.hz, audio.numel())
-                plt.plot(t, audio.numpy().squeeze(), color='b')
-                plt.ylim(-1, 1)
-                plt.show()
+                # plt.ion()
+                # plt.cla()
+                # plt.plot(t, audio.numpy().squeeze(), color='b')
+                # plt.ylim(-1, 1)
+                # plt.show()
 
-                cv2.imshow('mel', temp)
-                if cv2.waitKey(1) == ord('q'):
-                    exit()
+                # cv2.imshow('mel', temp)
+                # if cv2.waitKey(1) == ord('q'):
+                #     exit()
                 # plt.ion()
                 # plt.imshow(mel.squeeze().numpy(), cmap = 'viridis',origin='lower',)
                 # plt.show()
@@ -241,12 +247,10 @@ class RobotNode:
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]
         # a_inp: [batch, 1, T]
-        print("Old video shape", video[0].shape, len(video))
-
+        # print("Old video shape", video[0].shape, len(video))
+        
         video = video[-self.n_stack_images:]
-        # video = [(img)/ 255.0 for img in video]
-        video = [(img).astype(np.float32)/ 255.0 for img in video]
-        print("video shape", type(video[0]), video[0].shape, len(video))
+        # print("video shape", type(video[0]), video[0].shape, len(video))
         return {
             'video' : video, # list of images
             'audio' : mel, # audio buffer

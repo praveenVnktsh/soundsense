@@ -1,7 +1,7 @@
 # image 
 fps: 10 #capture image fps
-resized_height_v: 100
-resized_width_v: 75
+resized_height_v: 75
+resized_width_v: 100
 
 sample_rate_audio: 48000
 resample_rate_audio: 16000
@@ -18,7 +18,7 @@ action_dim: 11
 num_stack: 6
 num_heads: 8
 norm_audio: True
-lstm_hidden_layers: 2
+lstm_hidden_layers: 1
 
 
 # output_sequence_length: 30 # roughly 3 seconds

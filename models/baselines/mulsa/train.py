@@ -89,7 +89,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_path", type=str, required=True, help="Path to config file")
+    parser.add_argument("--config_path", type=str, default="/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/conf/new/train.yaml", help="Path to config file")
     parser.add_argument("--mha", action='store_true', help="Use MHA")
     parser.add_argument("--decoder", type=str, help="Decoder type", 
                         choices=['layered', 'multi_head', 'lstm', 'simple'], required=True)
@@ -97,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_sequence_length', type=int, required=True, help='Output sequence length')
     parser.add_argument('--audio_len', type=int, help='Output sequence length')
     parser.add_argument('--audio_encoder', type=str, default='spec', help='Audio encoder', choices=['spec', 'ast', 'hubert'])
+    
     args = parser.parse_args()
     
 

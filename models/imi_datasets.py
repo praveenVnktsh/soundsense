@@ -120,8 +120,8 @@ class ImitationEpisode(Dataset):
             self.transform_cam = A.Compose([
                 # A.Resize(height=self.resized_height_v, width=self.resized_width_v),
                 
-                A.Normalize(mean=0.485,
-                                 std=0.229, max_pixel_value= 1.0),
+                A.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
                 # A.Normalize(
                 #     # mean=0.5,
                 #     # std=0.5,
@@ -402,17 +402,17 @@ if __name__ == "__main__":
     )
     print("Dataset size", len(dataset))
     i = 120
-    print(len(dataset[i]))
     (cam_gripper_framestack, mel_spec), (xyzgt, frame_idx) = dataset[i]
     # save images
     stacked = []
     print("actions", xyzgt.shape)
     print("melspec", mel_spec.shape, "min", mel_spec.min(), "max", mel_spec.max())
+    print("framestack.shape", cam_gripper_framestack.shape)
     for idx, img in enumerate(cam_gripper_framestack):
         print("image ", idx, "min", img.min(), "max", img.max())
         img = img.permute(1, 2, 0).numpy() * 0.28 + 0.48
         img = np.clip(img, 0, 1)
         stacked.append(img.copy())
-    stacked = np.vstack(stacked)
+    stacked = np.hstack(stacked)
     plt.imsave('temp/melspec.png', mel_spec[0].numpy(), cmap='viridis', origin='lower', )
     plt.imsave(f'temp/0.png', stacked)

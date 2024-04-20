@@ -51,11 +51,11 @@ class Actor(torch.nn.Module):
         if self.decoder_type == 'simple':
             print("Creating simple decoder")
             self.decoder = nn.Sequential(
-                nn.Linear(self.layernorm_embed_shape, self.layernorm_embed_shape//2),
+                nn.Linear(256, 256),
                 nn.ReLU(),
-                nn.Linear(self.layernorm_embed_shape//2, self.layernorm_embed_shape//2),
+                nn.Linear(256, 128),
                 nn.ReLU(),
-                nn.Linear(self.layernorm_embed_shape//2, self.output_sequence_length * self.action_dim)
+                nn.Linear(128, self.output_sequence_length * self.action_dim)
             )
 
         if self.decoder_type == "layered" or self.decoder_type == "multi_head":
