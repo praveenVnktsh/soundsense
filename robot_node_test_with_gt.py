@@ -212,6 +212,7 @@ class RobotNode:
             # print(audio.max(), audio.min(), audio.mean(), mel.max(), mel.min(), mel.mean())
             if self.norm_audio:
                 mel /= mel.sum(dim = -2, keepdim = True)
+            
         # print(len(video))
         if save:
             stacked = np.hstack(video)
@@ -223,16 +224,12 @@ class RobotNode:
 
             if self.use_audio:
                 import matplotlib.pyplot as plt
-                temp = mel.squeeze().numpy()
-                # print("Min max", temp.min(), temp.max())
-                # np.save(f'models/temp/{self.idx}.npy', temp)
-                # exit()
+                temp = mel.clone().squeeze().numpy()
                 temp -= temp.min()
                 temp /= temp.max()
                 temp = cv2.resize(temp, self.stacked.shape[:2][::-1])
                 temp = (temp * 255).astype(np.uint8)
                 temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
-                print(temp.shape, self.stacked.shape)
                 self.stacked = np.vstack([self.stacked, temp])
 
         # cam_gripper_framestack,audio_clip_g
@@ -245,5 +242,6 @@ class RobotNode:
         return {
             'video' : video, # list of images
             'audio' : mel, # audio buffer
+            # 'audio' : torch.zeros_like(mel), # audio buffer
         }
 
