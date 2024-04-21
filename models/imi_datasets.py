@@ -63,6 +63,7 @@ class ImitationEpisode(Dataset):
 
         self.actions, self.audio_gripper, self.episode_length, self.image_paths = self.get_episode()
         if self.audio_gripper is not None:
+            
             self.resolution = (self.audio_gripper.numel()) // self.episode_length
         # self.action_dim = config['action_dim']
         
@@ -81,53 +82,42 @@ class ImitationEpisode(Dataset):
             self.transform_cam = A.Compose([
                 
                 # A.Resize(height=self.resized_height_v, width=self.resized_width_v),
-                # A.GaussianBlur(
-                #     sigma_limit=(0.2, 0.6),
-                #     p=p_apply[0]
-                # ),  # Gaussian blur with 10% probability
-                # A.OneOf([
-                #     A.RandomBrightnessContrast(
-                #         brightness_limit=0.15,
-                #         contrast_limit=0.15,
-                #         p = 0.5,
-                #     ),# Random brightness and contrast adjustments with 20% probability
-                #     A.ColorJitter(
-                #         brightness=0, contrast=0, saturation=0, hue=0.1,
-                #         p = 0.5
-                #     ),
-                # ], p=p_apply[1]),
-                # A.ShiftScaleRotate(
-                #     shift_limit=0.1, 
-                #     scale_limit=0.1, 
-                #     rotate_limit=15, 
-                #     p=p_apply[2]
-                # ),
-                # A.ZoomBlur(
-                #     max_factor=1.11,
-                #     p = p_apply[3]
-                # ),
-                
-                # A.Normalize(mean=0.485,
-                #                  std=0.229, max_pixel_value= 1.0),
+                A.GaussianBlur(
+                    sigma_limit=(0.2, 0.6),
+                    p=p_apply[0]
+                ),  # Gaussian blur with 10% probability
+                A.OneOf([
+                    A.RandomBrightnessContrast(
+                        brightness_limit=0.15,
+                        contrast_limit=0.15,
+                        p = 0.5,
+                    ),# Random brightness and contrast adjustments with 20% probability
+                    A.ColorJitter(
+                        brightness=0, contrast=0, saturation=0, hue=0.1,
+                        p = 0.5
+                    ),
+                ], p=p_apply[1]),
+                A.ShiftScaleRotate(
+                    shift_limit=0.1, 
+                    scale_limit=0.1, 
+                    rotate_limit=15, 
+                    p=p_apply[2]
+                ),
+                A.ZoomBlur(
+                    max_factor=1.11,
+                    p = p_apply[3]
+                ),
                 A.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
                 ToTensorV2(),
             ], additional_targets= {
                 f'image{i}': 'image' for i in range(self.num_stack)})
-
         else:
             self.transform_cam = A.Compose([
                 # A.Resize(height=self.resized_height_v, width=self.resized_width_v),
                 
                 A.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
-                # A.Normalize(
-                #     # mean=0.5,
-                #     # std=0.5,
-                #     mean=[0.485, 0.456, 0.406],
-                #     std=[0.229, 0.224, 0.225], 
-                #     max_pixel_value= 1.0
-                # ),
                 ToTensorV2(),
             ])
 
@@ -160,7 +150,7 @@ class ImitationEpisode(Dataset):
             [left_pad, audio[:, audio_start:audio_end], right_pad], dim=1
         )
         
-        audio_clip = torchaudio.functional.resample(audio_clip, self.sample_rate_audio, self.resample_rate_audio)
+        
         # print("Inside clip_resample output shape", audio_clip.shape)
         
         return audio_clip
@@ -187,6 +177,7 @@ class ImitationEpisode(Dataset):
             ]
             audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
             audio_gripper = (audio_gripper).reshape(1,-1)
+            audio_gripper = torchaudio.functional.resample(audio_gripper, self.sample_rate_audio, self.resample_rate_audio)
         else:
             audio_gripper = None
 
@@ -267,7 +258,7 @@ class ImitationEpisode(Dataset):
         
         if self.audio_gripper is not None:
             audio_end = idx * self.resolution
-            audio_start = audio_end - self.audio_len * self.sample_rate_audio
+            audio_start = audio_end - self.audio_len * self.resample_rate_audio
             audio_clip_g = self.clip_resample(
                 self.audio_gripper, audio_start, audio_end
             ).float()
@@ -372,7 +363,7 @@ if __name__ == "__main__":
     os.makedirs('temp', exist_ok=True)
     dataset = ImitationEpisode(
         config = {
-            'fps': 30,
+            'fps': 10,
             'audio_len': 3,
             'sample_rate_audio': 48000,
             'resample_rate_audio': 16000,

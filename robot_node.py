@@ -185,21 +185,24 @@ class RobotNode:
             # cv2.imwrite('stacked.jpg', stacked)
         
             stacked = cv2.resize(stacked, (0, 0), fx = 2, fy = 2)
-            cv2.imshow('stacked', stacked)
-            cv2.waitKey(1)
+            
             if self.use_audio:
                 import matplotlib.pyplot as plt
                 # plt.ion()
                 # plt.imshow(mel.squeeze().numpy(), cmap = 'viridis',origin='lower',)
                 # plt.show()
-                # temp =  mel.numpy().squeeze().copy()
-                # temp -= temp.min()
-                # temp /= temp.max()
-                # temp *= 255
-                # temp = temp.astype(np.uint8)
-                # temp = cv2.resize(temp, (0, 0), fx = 3, fy = 3)
-                # cv2.imshow('mel', temp)
-                # cv2.waitKey(1)
+                temp =  mel.clone().numpy().squeeze()
+                temp -= temp.min()
+                temp /= temp.max()
+                temp *= 255
+                temp = temp.astype(np.uint8)
+                temp = cv2.resize(temp, stacked.shape[:2][::-1])
+                stacked = np.vstack([stacked, temp])
+                
+            
+            cv2.imshow('stacked', stacked)
+            cv2.waitKey(1)
+                
             
             
 
