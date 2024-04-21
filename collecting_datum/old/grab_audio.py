@@ -14,65 +14,76 @@ from std_msgs.msg import String
 import cv2
 import sys
 import rospy
-import numpy as np
-from audio_common_msgs.msg import AudioData
 
 rospy.init_node('grab_audio', anonymous=True)
 def callBackEndRecording(data: String):
 	# if comething was publish in this topic, stop recording
-	global reccord, w, path, buffer
+	global reccord, w, path, inp
 	print("received", data.data)
 
 	if data.data.split('.')[0] == 'start':
 		print("Started recording")
+		inp = alsaaudio.PCM(
+			rate = 48000,
+			type = alsaaudio.PCM_CAPTURE,
+			format = alsaaudio.PCM_FORMAT_S16_LE, 
+			# periodsize = 32,
+			channels = 1,
+			# device = 'hw:1,0'
+		)
+		# inp.setchannels(1)
+		# inp.setrate(48000)
+		# inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+		# inp.setperiodsize(1024)
+		
 		run_id = data.data.split('.')[1]
 		pathFolder = '../data/sorting/' + run_id + '/'
 		os.makedirs(pathFolder, exist_ok= True)
 		os.makedirs(pathFolder + 'video/', exist_ok= True)
 		path = pathFolder + f"{datetime.datetime.now().strftime('%s%f')}.wav"
-		
+		w = wave.open(path, 'w')
+		w.setnchannels(1)
+		w.setsampwidth(2)
+		w.setframerate(48000)
 		reccord = True
-		buffer = []
 	else:
+		inp.close()
+		w.close()
+		w = None
 		reccord = False
+	
 
-		with wave.open(path, 'wb') as wf:
-			wf.setnchannels(1)  
-			wf.setsampwidth(2)  
-			wf.setframerate(16000)
-			origbuf = np.array(buffer.copy(), dtype = np.int16)
-			wf.writeframes(origbuf.tobytes())
 
-buffer = []
-def callback( data):
-	global reccord, buffer
-	if reccord:
-		# audio = np.frombuffer(data.data, dtype=np.int16).copy().astype(np.float64)
-		# audio /= 32768
-		# audio = audio.tolist()
-		audio = np.frombuffer(data.data, dtype=np.int16).tolist()
-		buffer += (audio.copy())
-
-audio_sub = rospy.Subscriber('/audio/audio', AudioData, callback)
-
+	
 sub = rospy.Subscriber('end_recording', String, callBackEndRecording)
 
+
 reccord = False
-path = None
 
 if __name__ == '__main__':
 
 
+	# date = datetime.datetime.now().strftime("%s")
+	# while date[-1] != '0':
+	# 	date = datetime.datetime.now().strftime("%s")
+	# print("Starting audio capture at", date)
+	inp = None
+	
 	# create listener
 	w = None
-	print("Waiting to start record")
-	try:	
-		rospy.spin()
-	except KeyboardInterrupt:
-		if w is not None:
-			w.close()
-			w = None
-		sys.exit(0)
+	
+	while not rospy.is_shutdown():
+		
+			
+		while w is not None and reccord == True:
+			try:
+				l, data = inp.read()
+			# a = numpy.fromstring(data, dtype='int16')
+				w.writeframes(data)
+			except:
+				continue
+
+
 	
 		
 			
