@@ -151,7 +151,7 @@ class RobotNode:
         return audio_clip
     def generate_inputs(self, save = True):
         
-        video = self.history['video'].copy() # subsample n_frames of interest
+        video = self.history['video'].copy() # subsample n_frame s of interest
         n_images = len(video)
 
         choose_every = n_images // self.n_stack_images

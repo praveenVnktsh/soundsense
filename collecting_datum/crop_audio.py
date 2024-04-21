@@ -4,7 +4,7 @@ import os
 from natsort import natsorted
 
 # root_fold = '/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups'
-root_fold = '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data'
+root_fold = '/home/punygod_admin/SoundSense/soundsense/data/mulsa/sorting'
 for run_id in natsorted(os.listdir(root_fold)):
     print("Processing ", run_id)
     root = f'{root_fold}/{run_id}'

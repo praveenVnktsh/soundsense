@@ -15,8 +15,20 @@ mapping = {
     'j': 8,
     'l': 9,
 }
+
+# new task
+mapping = {
+    'w': 0,
+    's': 1,
+    'n': 2,
+    'm': 3,
+    'k': 4,
+    'j': 5,
+    'l': 6,
+}
+
 # for folder
-og_root = '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data'
+og_root = '/home/punygod_admin/SoundSense/soundsense/data/mulsa/sorting'
 print(len(os.listdir(og_root)))
 for run_id in os.listdir(og_root):
     root = f'{og_root}/{run_id}'
@@ -27,7 +39,7 @@ for run_id in os.listdir(og_root):
         actions = []
         for line in data:
             line = line.split('\t')[1].strip()
-            action = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            action = [0] * (len(mapping) + 1)
             
             if line in mapping.keys():
                 action[mapping[line]] = 1

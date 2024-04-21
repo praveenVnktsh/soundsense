@@ -21,20 +21,7 @@ class ImiEngine(LightningModule):
 
         self.loss_cce = torch.nn.CrossEntropyLoss(
             reduction='mean',
-            weight= torch.tensor([
-                0.06478152024111762, 
-                0.06246989835134276, 
-                0.09888640613718172, 
-                0.10121771630151609, 
-                0.09929480263829896, 
-                0.12452994585024232, 
-                0.13838784465936368, 
-                0.13897445980050166, 
-                0.07656873103658211, 
-                0.07574852408786006, 
-                0.019140150895993087
-                # 0,
-            ]),
+            weight= torch.tensor(config['loss_weights']),
             # ignore_index=10
         )
         self.validation_step_outputs = []

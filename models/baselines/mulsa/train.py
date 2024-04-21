@@ -118,6 +118,7 @@ if __name__ == "__main__":
     config['exp_name'] = 'imi_' + config['modalities'] + '_' + config['decoder_type'] + "_seqlen_" + str(config['output_sequence_length'])
     if config['use_mha']:
         config['exp_name'] += '_mha'
-    config['exp_name'] += "_"+config['audio_encoder']
+    config['exp_name'] += "_"+config['audio_encoder'] 
+    config['exp_name'] = config['dataset_root'].split('/')[-1] + '_' + config['exp_name']
 
     main(config)

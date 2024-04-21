@@ -3,3 +3,4 @@ experiments/
 *.csv
 lightning_logs/
 trained_models/
+pretrained/
