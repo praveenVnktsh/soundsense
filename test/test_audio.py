@@ -20,7 +20,7 @@ def callback(data):
 
 rospy.init_node("temp")
 audio_sub = rospy.Subscriber('/audio/audio', AudioData, callback)
-rospy.sleep(15)
+rospy.sleep(5)
 audio_sub.unregister()
 
 print("Audio recorded for ", time.time() - starttime, " seconds")

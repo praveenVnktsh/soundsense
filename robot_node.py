@@ -22,7 +22,7 @@ class RobotNode:
         
         params['camera_id'] = '/dev/video6'
 
-        self.image_shape = [params['resized_height_v'], params['resized_width_v']]
+        self.image_shape = [params['resized_width_v'], params['resized_height_v']]
 
         self.hz = params['resample_rate_audio']
         self.audio_n_seconds = params['audio_len']
@@ -56,9 +56,10 @@ class RobotNode:
             idx.append(idx[-1] + i)
         self.idx = np.array(idx)
 
+        self.m = 2
         self.weights = np.array([np.exp(-self.m*i) for i in range(self.seq_len)])
 
-        self.temporal_ensemble_arr = np.zeros(((self.seq_len - 1)*(self.seq_len - 2)/2, self.output_dim))
+        self.temporal_ensemble_arr = np.zeros(((self.seq_len)*(self.seq_len + 1)//2-self.seq_len, self.output_dim))
 
     
     def callback(self, data):
@@ -83,7 +84,7 @@ class RobotNode:
                 exit()
 
         r.lift.move_to(0.9)
-        r.arm.move_to(0.3)
+        r.arm.move_to(0.2)
         r.end_of_arm.move_to('wrist_yaw', 0.0)
         r.end_of_arm.move_to('wrist_pitch', 0.0)
         r.end_of_arm.move_to('wrist_roll', 0.0)
@@ -111,6 +112,7 @@ class RobotNode:
         loop_start_time = time.time()
         
         n_stack = self.n_stack_images * self.audio_n_seconds
+        hist_actions = []
         while is_run:
             frame = self.get_image()
             if len(self.history['video']) > 0:
@@ -125,8 +127,13 @@ class RobotNode:
                     if len(self.history['video']) > n_stack:
                         self.history['video'] = self.history['video'][-n_stack:]
 
-                    
-                    self.execute_action()
+                    # try:
+                    #     hist_actions = self.execute_action(hist_actions)
+                    #     if len(hist_actions)>0:
+                    #         np.savetxt("actions.txt", hist_actions,fmt='%s')
+                    # except:
+                    #     self.boot_robot()
+                    #     is_run = False
                 else:
                     print("No frame")
                     is_run = False
@@ -170,11 +177,13 @@ class RobotNode:
             print("AUDIO_MEL", mel.min(), mel.max())
             print("RAW_AUDIO", audio.min(), audio.max())
             print("Time to process audio: ", time.time() - starttime)
+        else:
+            mel = None
 
         if save:
             stacked = np.hstack(video)
             # cv2.imwrite('stacked.jpg', stacked)
-            print("IMSHOWING")
+        
             stacked = cv2.resize(stacked, (0, 0), fx = 2, fy = 2)
             
             if self.use_audio:
@@ -209,7 +218,7 @@ class RobotNode:
             'audio' : mel, # audio buffer
         }
 
-    def execute_action(self):
+    def execute_action(self, hist_actions=[]):
         # lift, extension, lateral, roll, gripper
         # action_space = [del_extension, del_height, del_lateral, del_roll, del_gripper]
         # action[0] = np.clip(action[0], -0.01, 0.01)
@@ -218,18 +227,23 @@ class RobotNode:
         starttime = time.time()
         outputs = self.model(inputs) # 11 dimensional
         print("Time to run model: ", time.time() - starttime)
+        outputs_model = outputs.clone()
         if self.temp_ensemble:
-            outputs = outputs.squeeze(0)
-            self.temporal_ensemble_arr = np.stack([self.temporal_ensemble_arr, outputs], axis = 0)
+            outputs = outputs.squeeze(0).detach().numpy()
+            # print("tea shape",self.temporal_ensemble_arr.shape)
+            # print("outputs shape", outputs.shape)
+            self.temporal_ensemble_arr = np.concatenate([self.temporal_ensemble_arr, outputs], axis = 0)
             
-            print("TE SHAPE: ", self.temporal_ensemble_arr.shape)
+            # print("TE SHAPE: ", self.temporal_ensemble_arr.shape)
             values = self.temporal_ensemble_arr[self.idx, :]
-            outputs = np.mean(values * self.weights, axis = 0)
-            print("OUTPUTS: ", outputs)
-            print(outputs.shape)
-            self.temporal_ensemble_arr = np.delete(self.temporal_ensemble_arr, self.idx)
+            outputs = np.average(values, weights=self.weights, axis = 0)
+            # print("OUTPUTS: ", outputs)
+            # print(outputs.shape)
+            outputs_softmax = torch.nn.functional.softmax(torch.tensor(outputs))
+            self.temporal_ensemble_arr = np.delete(self.temporal_ensemble_arr, self.idx, axis=0)
+            # print("TE SHAPE after delete: ", self.temporal_ensemble_arr.shape)
         else:
-            outputs = torch.nn.functional.softmax(outputs.squeeze(0)[0])
+            outputs_softmax = torch.nn.functional.softmax(outputs.squeeze(0)[0])
         # w - extend arm
         # s - retract arm
         # a - move left
@@ -258,8 +272,10 @@ class RobotNode:
         }
         inv_mapping = {v: k for k, v in mapping.items()}
 
-        action_idx = torch.argmax(outputs).item()
-        print("action: ", inv_mapping[action_idx], "output: ", outputs)
+        action_idx = torch.argmax(outputs_softmax).item()
+        action_model_idx = torch.argmax(torch.nn.functional.softmax(outputs_model.squeeze(0)[0])).item()
+        print("action te: ", inv_mapping[action_idx], "action:",inv_mapping[action_model_idx], "output: ", outputs)
+        hist_actions.append((inv_mapping[action_idx].ljust(6), inv_mapping[action_model_idx].ljust(6)))
         big = 0.05
         movement_resolution = {
             0: big,
@@ -286,4 +302,4 @@ class RobotNode:
         if action_idx != 10 and not self.testing:
             r.push_command()
 
-        return True
+        return hist_actions

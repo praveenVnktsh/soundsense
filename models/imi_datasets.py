@@ -391,7 +391,7 @@ if __name__ == "__main__":
         train=True
     )
     print("Dataset size", len(dataset))
-    i = 100
+    i = 18
     print("Index", i)
     (cam_gripper_framestack, mel_spec), (xyzgt, frame_idx) = dataset[i]
     # save images

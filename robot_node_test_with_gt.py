@@ -32,7 +32,7 @@ class RobotNode:
             'audio': [0] * self.hz * self.audio_n_seconds,
             'video': [],
         }
-        self.run_id = '20'
+        self.run_id = '129'
         if not is_unimodal:
             data = sf.read(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized/{self.run_id}/processed_audio.wav')[0]
             # data = sf.read(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/processed_audio.wav')[0]
@@ -224,7 +224,10 @@ class RobotNode:
 
             if self.use_audio:
                 import matplotlib.pyplot as plt
-                temp = mel.clone().squeeze().numpy()
+                temp = mel.squeeze().numpy()
+                # print("Min max", temp.min(), temp.max())
+                # np.save(f'models/temp/{self.idx}.npy', temp)
+                # exit()
                 temp -= temp.min()
                 temp /= temp.max()
                 temp = cv2.resize(temp, self.stacked.shape[:2][::-1])
