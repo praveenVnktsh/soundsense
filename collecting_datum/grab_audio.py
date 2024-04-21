@@ -30,7 +30,7 @@ def callBackEndRecording(data: String):
 		inp.setperiodsize(1024)
 		
 		run_id = data.data.split('.')[1]
-		pathFolder = '../stretch/data/data_two_cups/' + run_id + '/'
+		pathFolder = '../data/sorting/' + run_id + '/'
 		os.makedirs(pathFolder, exist_ok= True)
 		os.makedirs(pathFolder + 'video/', exist_ok= True)
 		path = pathFolder + f"{datetime.datetime.now().strftime('%s%f')}.wav"

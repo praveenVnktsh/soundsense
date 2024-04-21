@@ -81,7 +81,6 @@ class GetKeyboardCommands:
             return
 
         joints = joint_state.name
-        print(joints)
         def in_joints(i):
             return len(list(set(i) & set(joints))) > 0
 
@@ -89,11 +88,9 @@ class GetKeyboardCommands:
         print("""
             w - extend arm
             s - retract arm
-            a - move left
-            d - move right
 
-            i - lift up
-            k - lift down
+            i - pitch up
+            k - pitch down
 
             l - roll right
             j - roll left
@@ -237,10 +234,11 @@ class GetKeyboardCommands:
         
         # 8 or up arrow
         if c == 'i' or c == '\x1b[A':
-            command = {'joint': 'joint_lift', 'delta': self.get_deltas()['translate']}
+            
+            command = {'joint': 'joint_wrist_pitch', 'delta': self.get_deltas()['rad']}
         # 2 or down arrow
         if c == 'k' or c == '\x1b[B':
-            command = {'joint': 'joint_lift', 'delta': -self.get_deltas()['translate']}
+            command = {'joint': 'joint_wrist_pitch', 'delta': -self.get_deltas()['rad']}
         # if self.mode == 'manipulation':
         #     # 4 or left arrow
         #     if c == 'a' or c == '\x1b[D':
@@ -248,13 +246,13 @@ class GetKeyboardCommands:
         #     # 6 or right arrow
         #     if c == 'd' or c == '\x1b[C':
         #         command = {'joint': 'joint_mobile_base_translation', 'delta': -self.get_deltas()['translate']}
-        if self.mode == 'position':
-            # 4 or left arrow
-            if c == 'a' or c == '\x1b[D':
-                command = {'joint': 'translate_mobile_base', 'inc': self.get_deltas()['translate']}
-            # 6 or right arrow
-            if c == 'd' or c == '\x1b[C':
-                command = {'joint': 'translate_mobile_base', 'inc': -self.get_deltas()['translate']}
+        # if self.mode == 'position':
+        #     # 4 or left arrow
+        #     if c == 'a' or c == '\x1b[D':
+        #         command = {'joint': 'translate_mobile_base', 'inc': self.get_deltas()['translate']}
+        #     # 6 or right arrow
+        #     if c == 'd' or c == '\x1b[C':
+        #         command = {'joint': 'translate_mobile_base', 'inc': -self.get_deltas()['translate']}
             # 1 or end key 
             # if c == '7' or c == '\x1b[H':
             #     command = {'joint': 'rotate_mobile_base', 'inc': self.get_deltas()['rad']}
@@ -338,6 +336,7 @@ class KeyboardTeleopNode(hm.HelloNode):
 
     def send_command(self, command):
         joint_state = self.joint_state
+        print(joint_state)
         if (joint_state is not None) and (command is not None) and (isinstance(command, dict)):
             point = JointTrajectoryPoint()
             point.time_from_start = rospy.Duration(0.0)
@@ -425,7 +424,34 @@ class KeyboardTeleopNode(hm.HelloNode):
             rospy.loginfo('Node ' + self.node_name + ' connected to /deliver_object/trigger_deliver_object.')
             self.trigger_deliver_object_service = rospy.ServiceProxy('/deliver_object/trigger_deliver_object', Trigger)
 
-        rospy.Subscriber('/stretch/joint_states', JointState, self.joint_states_callback)
+        # rospy.Subscriber('/stretch/joint_states', JointState, self.joint_states_callback)
+        # rospy.wait_for_message('/stretch/joint_states', JointState)
+        print("Sending commands")
+        sleepdur = 1
+        for i in range(1):
+            print("Sending command, pitch")
+            self.send_command(
+                {"joint": "joint_wrist_pitch", "inc": 0.0},
+            )
+            rospy.sleep(sleepdur)
+            print("Sending command, lift")
+            self.send_command(
+                {'joint': 'joint_lift', 'inc': 1.05}
+            )   
+            rospy.sleep(sleepdur)
+            print("Sending command, finger")
+            self.send_command(
+                {'joint': 'joint_gripper_finger_left', 'inc': 1.0}
+            )
+            rospy.sleep(sleepdur)
+            print("Sending command, extension")
+            self.send_command(
+                {'joint': 'wrist_extension', 'inc' : 0.0}
+            )
+            rospy.sleep(sleepdur)
+        
+
+
 
 
         rate = rospy.Rate(self.rate)
