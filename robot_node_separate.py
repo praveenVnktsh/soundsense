@@ -12,6 +12,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from std_msgs.msg import String, ByteMultiArray
 from models.audio_processor import AudioProcessor
+from std_msgs.msg import Header
 import json
 
 class RobotNode:
@@ -40,7 +41,6 @@ class RobotNode:
         self.use_audio = "ag" in config['modalities'].split("_")
         if self.use_audio:
             audio_sub = rospy.Subscriber('/audio/audio', AudioData, self.audio_callback)
-            print("Waiting for audio data...")
             # rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
         self.cap  = cv2.VideoCapture(cam)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -60,11 +60,12 @@ class RobotNode:
         self.temporal_ensemble_arr = np.zeros(((self.seq_len)*(self.seq_len + 1)//2-self.seq_len, self.output_dim))
 
         self.image_pub = rospy.Publisher('/raw_image', Image, queue_size=1)
-        self.audio_pub = rospy.Publisher('/melspec', ByteMultiArray, queue_size=1)
+        self.audio_pub = rospy.Publisher('/raw_audio', AudioDataStamped, queue_size=1)
 
         # make a uint8 list of actions subscriber
         self.outputs_sub = rospy.Subscriber('/model_outputs', String, self.get_model_inference)
         self.bridge = CvBridge()
+        print("Started")
     
     def execute_action(self, sequence):
         r = self.r
@@ -149,6 +150,8 @@ class RobotNode:
     def get_image(self):
         h, w = self.image_shape 
         ret, frame = self.cap.read()
+        # frame = np.random.randint(0, 255, (10, 10, 3), dtype=np.uint8)
+        # ret = True
         frame = cv2.resize(frame, (h, w))
         # this is required since we are using imageio to read images which reads in RGB format
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -168,6 +171,7 @@ class RobotNode:
 
         rate = rospy.Rate(loop_rate)
         while is_run:
+            start_time = time.time()
             frame = self.get_image()
             curtime = time.time()
             self.history['video'].append(frame)
@@ -176,8 +180,12 @@ class RobotNode:
                 while self.history['timestamps'][-1] - self.history['timestamps'][0] > self.audio_n_seconds:
                     self.history['video'] = self.history['video'][1:]
                     self.history['timestamps'] = self.history['timestamps'][1:]
-            self.generate_inputs()
-            rate.sleep()
+            
+            if time.time() - loop_start_time > self.audio_n_seconds + 1: # warmup
+                self.generate_inputs()
+                
+            # rate.sleep()
+            print(time.time() - start_time, len(self.history['video']), len(self.history['audio']))
 
         print("Ending run loop")
 
@@ -187,22 +195,35 @@ class RobotNode:
         n_images = len(video)
 
         choose_every = n_images // self.n_stack_images
+        print(n_images, choose_every, self.n_stack_images)
+        
 
         video = video[::choose_every]
         
         if self.use_audio:
             audio = torch.tensor(self.history['audio']).float()
-            audio = audio.unsqueeze(0)
             # mel = self.audio_processor.process(audio, 0, audio.size(-1))
+            audio_to_send = audio.numpy().tobytes()
+        
         else:
-            audio = torch.tensor([])
+            audio_to_send = []
 
         stacked = np.hstack(video)
         stacked *= 255
         stacked = stacked.astype(np.uint8)
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(stacked))
-        self.audio_pub.publish(ByteMultiArray(data=audio.numpy().tobytes()))
-            
+        header = Header(
+            stamp = rospy.Time.now()
+        )
+        imgmsg = self.bridge.cv2_to_imgmsg(stacked)
+        imgmsg.header = header
+        self.image_pub.publish(imgmsg)
+
+        self.audio_pub.publish(AudioDataStamped(
+            audio = AudioData(data = audio_to_send),
+            header = header
+        ))
+        print("published")
+
 
 
     

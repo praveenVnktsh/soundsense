@@ -21,8 +21,9 @@ import message_filters
 from std_msgs.msg import String
 import json
 from std_msgs.msg import ByteMultiArray
+from audio_common_msgs.msg import AudioDataStamped
 import sys
-sys.path.append('../')
+sys.path.append('/home/hello-robot/soundsense/soundsense/models/')
 from audio_processor import AudioProcessor
 import cv2
 class MULSAInference(pl.LightningModule):
@@ -55,23 +56,24 @@ class MULSAInference(pl.LightningModule):
         print("Model loaded")
         
     def start_pub_sub(self):
-        self.data_pub = rospy.Publisher("/model_output", String, queue_size=10)
-        data_sub = message_filters.ApproximateTimeSynchronizer(
+        self.data_pub = rospy.Publisher("/model_outputs", String, queue_size=10)
+        data_sub = message_filters.TimeSynchronizer(
             [
                 message_filters.Subscriber("/raw_image", Image),
-                message_filters.Subscriber("/melspec", ByteMultiArray)
+                message_filters.Subscriber("/raw_audio", AudioDataStamped)
             ],
             queue_size=2,
-            slop = 0.05,
         )
-        print("waiting for images")
         data_sub.registerCallback(self.process)
+        print("waiting for images")
 
     def process(self, image, audio):
         image = np.frombuffer(image.data, dtype=np.uint8).reshape(image.height, image.width, -1)
         if self.use_audio:
-            audio = np.frombuffer(audio.data, dtype=np.uint16)
-            mel = self.audio_processor.process(audio)
+            audio = np.frombuffer(audio.audio.data, dtype=np.int16).astype(np.float32)
+            audio = torch.tensor(audio, dtype=torch.float32).unsqueeze(0)
+            print(audio.shape)
+            mel = self.audio_processor.process(audio, 0, audio.size(-1))
         else:
             mel = None
 

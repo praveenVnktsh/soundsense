@@ -16,7 +16,7 @@ class AudioProcessor:
         self.audio_encoder = config["audio_encoder"] if "audio_encoder" in config else "spec"
         self.norm_audio = config["norm_audio"] if "norm_audio" in config else False
 
-    def process(self, audio, audio_start, audio_end, clip_and_resample = True):
+    def process(self, audio, audio_start, audio_end, clip_and_resample = False):
         if clip_and_resample:
             audio = self.clip_and_resample(audio, audio_start, audio_end, )
         
