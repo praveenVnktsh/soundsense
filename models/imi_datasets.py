@@ -17,6 +17,10 @@ from albumentations.pytorch import ToTensorV2
 from transformers import AutoProcessor
 import transformers
 import cv2
+from audio_processor import AudioProcessor
+
+
+
 class ImitationEpisode(Dataset):
     def __init__(self, 
             config,
@@ -63,24 +67,17 @@ class ImitationEpisode(Dataset):
 
         self.actions, self.audio_gripper, self.episode_length, self.image_paths = self.get_episode()
         if self.audio_gripper is not None:
-            
             self.resolution = (self.audio_gripper.numel()) // self.episode_length
+            self.audio_processor = AudioProcessor(config)
         # self.action_dim = config['action_dim']
         
         if self.train:
-            # self.transform_cam = T.Compose(
-            #     [
-            #         T.Resize((self.resized_height_v, self.resized_width_v)),
-            #         T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-            #     ]
-            # )
             p_apply = np.array([
                 1, 1, 1, 0.1
             ], dtype=np.float32)
             p_apply /= p_apply.sum()
             p_apply *= 0.5
             self.transform_cam = A.Compose([
-                
                 # A.Resize(height=self.resized_height_v, width=self.resized_width_v),
                 A.GaussianBlur(
                     sigma_limit=(0.2, 0.6),
@@ -121,14 +118,7 @@ class ImitationEpisode(Dataset):
                 ToTensorV2(),
             ])
 
-        if 'ag' in self.modalities:
-            self.mel = torchaudio.transforms.MelSpectrogram(
-                sample_rate=self.resample_rate_audio, 
-                n_fft=512, 
-                hop_length=int(self.resample_rate_audio * 0.01), 
-                n_mels=64
-            )
-            self.audio_encoder = config["audio_encoder"] if "audio_encoder" in config else "spec"
+        
         transformers.utils.logging.set_verbosity_error()
         
 
@@ -137,24 +127,6 @@ class ImitationEpisode(Dataset):
         image = np.array(Image.open(img_path)).astype(np.float32) / 255.0 # RGB FORMAT ONLY
         return image
     
-    def clip_resample(self, audio, audio_start, audio_end):
-        left_pad, right_pad = torch.Tensor([]), torch.Tensor([])
-        # print("au_size", audio.size())
-        if audio_start < 0:
-            left_pad = torch.zeros((audio.shape[0], -audio_start))
-            audio_start = 0
-        if audio_end >= audio.size(-1):
-            right_pad = torch.zeros((audio.shape[0], audio_end - audio.size(-1)))
-            audio_end = audio.size(-1)
-        audio_clip = torch.cat(
-            [left_pad, audio[:, audio_start:audio_end], right_pad], dim=1
-        )
-        
-        
-        # print("Inside clip_resample output shape", audio_clip.shape)
-        
-        return audio_clip
-
     def __len__(self):
         return self.episode_length
 
@@ -177,7 +149,6 @@ class ImitationEpisode(Dataset):
             ]
             audio_gripper = torch.as_tensor(np.stack(audio_gripper, 0))
             audio_gripper = (audio_gripper).reshape(1,-1)
-            audio_gripper = torchaudio.functional.resample(audio_gripper, self.sample_rate_audio, self.resample_rate_audio)
         else:
             audio_gripper = None
 
@@ -231,100 +202,13 @@ class ImitationEpisode(Dataset):
         else:
             cam_gripper_framestack = 0
 
-        # if self.input_past_actions:
-        #     history = torch.stack(
-        #         [
-        #             torch.Tensor(self.actions[i])
-        #             for i in frame_idx
-        #         ],
-        #         dim=0,
-        #     )
-        # else:
-        #     history = 0
-
-        # Random cropping
-        # if self.train:
-        #     img = self.transform_cam(
-        #         image = self.load_image(idx)
-        #     )['image']
-            
-        #     i_v, h_v = 0, self.resized_height_v
-        #     j_v, w_v = 0, self.resized_width_v
-        #     if "vg" in self.modalities:
-        #         cam_gripper_framestack = cam_gripper_framestack[
-        #             ..., i_v : i_v + h_v, j_v : j_v + w_v
-        #         ]
-
-        
         if self.audio_gripper is not None:
             audio_end = idx * self.resolution
             audio_start = audio_end - self.audio_len * self.resample_rate_audio
-            audio_clip_g = self.clip_resample(
-                self.audio_gripper, audio_start, audio_end
-            ).float()
-            if self.audio_encoder == "spec":
-                eps = 1e-8
-                mel = self.mel(audio_clip_g)
-                mel = np.log(mel + eps)
-                if self.norm_audio:
-                    mel /= mel.sum(dim=-2, keepdim=True)
-                    # print("mel", mel.shape, mel.min(), mel.max(), mel.mean(), mel.std())
-            else:
-                mel = audio_clip_g
-            # testing
-            # sf.write(f'temp/audio.wav', audio_clip_g[0].numpy(), self.resample_rate_audio)
-            # plt.imsave('temp/mel.png', mel[0].numpy(), cmap='viridis', origin='lower', )
-            # print("RESAMPLEd", audio_clip_g.min(), audio_clip_g.max(), audio_clip_g.mean(), audio_clip_g.std())
-            # print("AUDIO GRIPPER", self.audio_gripper.min(), self.audio_gripper.max(), self.audio_gripper.mean(), self.audio_gripper.std())
-            # exit()
-            # plot the raw waveform
+            mel = self.audio_processor.process(self.audio_gripper, audio_start, audio_end)
         else:
             mel = 0
  
-        # actions are always a list of N elements, just index however you want 
-        
-
-        # if self.stack_past_actions:
-        #     xyzgt = torch.stack(
-        #         [
-        #             torch.Tensor(self.actions[i])
-        #             for i in frame_idx
-        #         ],
-        #         dim=0,
-        #     )
-        
-        # frame_idx = np.arange(idx, idx + self.stack_future_actions_dim)
-        # frame_idx[frame_idx >= self.episode_length] = self.episode_length - 1
-        
-        # if self.output_model != "aux":
-        #     if self.stack_past_actions:
-        #         xyzgt = torch.cat(
-        #             [
-        #                 xyzgt,
-        #                 torch.stack(
-        #                     [
-        #                         torch.Tensor(self.actions[i]) if i < self.episode_length else torch.Tensor([0]*(self.action_dim - 1) + [1])
-        #                         for i in frame_idx 
-        #                     ],
-        #                     dim=0,
-        #                 ),
-        #             ],
-        #             dim=0,
-        #         )
-        #     else:
-        #         xyzgt = torch.stack(
-        #                     [
-        #                         torch.Tensor(self.actions[i]) if i < self.episode_length else torch.Tensor([0]*(self.action_dim - 1) + [1])
-        #                         for i in frame_idx
-        #                     ],
-        #                     dim=0,
-        #                 )
-
-        # if not self.stack_past_actions and self.output_model == "aux":
-        #     xyzgt = torch.Tensor(self.actions[idx])
-        
-        # print(cam_gripper_framestack.shape, mel.shape, xyzgt.shape)
-
         start_idx = idx
         end_idx = idx + self.output_sequence_length
         padding = torch.tensor([]) if end_idx <= self.episode_length else torch.tensor([[0] * (self.action_dim - 1) + [1]] * (end_idx - self.episode_length))
@@ -365,7 +249,7 @@ if __name__ == "__main__":
         config = {
             'fps': 10,
             'audio_len': 3,
-            'sample_rate_audio': 48000,
+            'sample_rate_audio': 16000,
             'resample_rate_audio': 16000,
             'modalities': 'vg_ag',
             'resized_height_v': 75,
@@ -382,7 +266,7 @@ if __name__ == "__main__":
             'history_encoder_dim': 32,
             'output_sequence_length' : 1,
             'action_history_length': 0,
-            'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized',
+            'dataset_root': '/home/punygod_admin/SoundSense/soundsense/data/mulsa/sorting',
             # 'dataset_root': '/home/praveen/dev/mmml/soundsense/data/',
             'num_stack': 6,
             'norm_audio' : True

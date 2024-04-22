@@ -10,6 +10,7 @@ import torchaudio
 import soundfile as sf
 from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
+from models.audio_processor import AudioProcessor
 
 class RobotNode:
     def __init__(self, config_path, model, testing= False):
@@ -19,24 +20,24 @@ class RobotNode:
         self.testing = False
         
         with open(config_path) as info:
-            params = yaml.load(info.read(), Loader=yaml.FullLoader)
+            config = yaml.load(info.read(), Loader=yaml.FullLoader)
 
         
         
-        params['camera_id'] = '/dev/video6'
+        config['camera_id'] = '/dev/video6'
 
-        self.image_shape = [params['resized_width_v'], params['resized_height_v']]
+        self.image_shape = [config['resized_width_v'], config['resized_height_v']]
 
-        self.hz = params['resample_rate_audio']
-        self.audio_n_seconds = params['audio_len']
-        cam = params['camera_id']
-        self.n_stack_images = params['num_stack']
-        self.norm_audio = params['norm_audio']
+        self.hz = config['resample_rate_audio']
+        self.audio_n_seconds = config['audio_len']
+        cam = config['camera_id']
+        self.n_stack_images = config['num_stack']
+        self.norm_audio = config['norm_audio']
         self.history = {
             'audio': [],
             'video': [],
         }
-        self.use_audio = "ag" in params['modalities'].split("_")
+        self.use_audio = "ag" in config['modalities'].split("_")
         if self.use_audio:
             audio_sub = rospy.Subscriber('/audio/audio', AudioData, self.callback)
             print("Waiting for audio data...")
@@ -67,6 +68,7 @@ class RobotNode:
         self.inputs_pub = rospy.Publisher('/model_inputs', CompressedImage, queue_size=10)
         self.inputs_sub = rospy.Subscriber('/model_inputs', CompressedImage, self.subscribe_inputs)
         self.bridge = CvBridge()
+        self.audio_processor = AudioProcessor(config)
 
     
     def callback(self, data):
@@ -106,8 +108,9 @@ class RobotNode:
         h, w = self.image_shape 
         ret, frame = self.cap.read()
         frame = cv2.resize(frame, (h, w))
-        # if self.bgr_to_rgb:
+        # this is required since we are using imageio to read images which reads in RGB format
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = frame.astype(np.float32) / 255
         if not ret:
             return None
         return frame
@@ -134,35 +137,14 @@ class RobotNode:
                     if len(self.history['video']) > n_stack:
                         self.history['video'] = self.history['video'][-n_stack:]
 
-                    # try:
-                    #     hist_actions = self.execute_action(hist_actions)
-                    #     if len(hist_actions)>0:
-                    #         np.savetxt("actions.txt", hist_actions,fmt='%s')
-                    # except:
-                    #     self.boot_robot()
-                    #     is_run = False
+                    hist_actions = self.execute_action(hist_actions)
+                    if len(hist_actions)>0:
+                        np.savetxt("actions.txt", hist_actions,fmt='%s')
                 else:
                     print("No frame")
                     is_run = False
 
         print("Ending run loop")
-    def clip_resample(self, audio, audio_start, audio_end):
-        left_pad, right_pad = torch.Tensor([]), torch.Tensor([])
-        # print("au_size", audio.size())
-        if audio_start < 0:
-            left_pad = torch.zeros((audio.shape[0], -audio_start))
-            audio_start = 0
-        if audio_end >= audio.size(-1):
-            right_pad = torch.zeros((audio.shape[0], audio_end - audio.size(-1)))
-            audio_end = audio.size(-1)
-        audio_clip = torch.cat(
-            [left_pad, audio[:, audio_start:audio_end], right_pad], dim=1
-        )
-        
-        # audio_clip = torchaudio.functional.resample(audio_clip, self.hz, self.resample_rate_audio)
-        # print("Inside clip_resample output shape", audio_clip.shape)
-        
-        return audio_clip
     def generate_inputs(self, save = True):
         
         video = self.history['video'].copy() # subsample n_frame s of interest
@@ -173,52 +155,36 @@ class RobotNode:
         video = video[::choose_every]
         
         if self.use_audio:
-            starttime = time.time()
             audio = torch.tensor(self.history['audio']).float()
-            audio = audio.unsqueeze(0).unsqueeze(0)
-            mel = self.mel(audio)
-            mel = np.log(mel + 1)
-            if self.norm_audio:
-                mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
-                mel -= mel.mean()            # TODO why are we doing this after the previous step?
-            print("AUDIO_MEL", mel.min(), mel.max())
-            print("RAW_AUDIO", audio.min(), audio.max())
-            print("Time to process audio: ", time.time() - starttime)
+            audio = audio.unsqueeze(0)
+            mel = self.audio_processor.process(audio, 0, audio.size(-1))
         else:
             mel = None
 
         if save:
             stacked = np.hstack(video)
-            # cv2.imwrite('stacked.jpg', stacked)
-        
             stacked = cv2.resize(stacked, (0, 0), fx = 2, fy = 2)
-            
+
             if self.use_audio:
-                import matplotlib.pyplot as plt
-                # plt.ion()
-                # plt.imshow(mel.squeeze().numpy(), cmap = 'viridis',origin='lower',)
-                # plt.show()
                 temp =  mel.clone().numpy().squeeze()
                 temp -= temp.min()
                 temp /= temp.max()
                 temp *= 255
                 temp = temp.astype(np.uint8)
                 temp = cv2.resize(temp, stacked.shape[:2][::-1])
+                temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
                 stacked = np.vstack([stacked, temp])
-                
-            
+
             cv2.imshow('stacked', stacked)
             cv2.waitKey(1)
                 
             
-            
-
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]
         # a_inp: [batch, 1, T]
         
         video = video[-self.n_stack_images:]
-        video = [(img).astype(float)/ 255 for img in video]
+        
         
         return {
             'video' : video, # list of images
