@@ -8,6 +8,9 @@ import rospy
 from audio_common_msgs.msg import AudioDataStamped, AudioData
 import torchaudio
 import soundfile as sf
+from sensor_msgs.msg import CompressedImage
+from cv_bridge import CvBridge
+
 class RobotNode:
     def __init__(self, config_path, model, testing= False):
         self.r = stretch_body.robot.Robot()
@@ -60,6 +63,10 @@ class RobotNode:
         self.weights = np.array([np.exp(-self.m*i) for i in range(self.seq_len)])
 
         self.temporal_ensemble_arr = np.zeros(((self.seq_len)*(self.seq_len + 1)//2-self.seq_len, self.output_dim))
+
+        self.inputs_pub = rospy.Publisher('/model_inputs', CompressedImage, queue_size=10)
+        self.inputs_sub = rospy.Subscriber('/model_inputs', CompressedImage, self.subscribe_inputs)
+        self.bridge = CvBridge()
 
     
     def callback(self, data):
@@ -173,7 +180,7 @@ class RobotNode:
             mel = np.log(mel + 1)
             if self.norm_audio:
                 mel = (mel - mel.min()) / (mel.max() - mel.min() + 1e-8)
-                mel -= mel.mean()
+                mel -= mel.mean()            # TODO why are we doing this after the previous step?
             print("AUDIO_MEL", mel.min(), mel.max())
             print("RAW_AUDIO", audio.min(), audio.max())
             print("Time to process audio: ", time.time() - starttime)
@@ -217,6 +224,78 @@ class RobotNode:
             'video' : video, # list of images
             'audio' : mel, # audio buffer
         }
+
+
+    def publish_inputs(self, inputs):
+        images = []
+        for img in inputs['video']:
+            img *= 255
+            img = img.astype(np.uint8)
+            img = cv2.resize(img, (256, 256))
+            images.append(img)
+        if inputs['audio'] is not None:
+            audio = inputs['audio'].clone().numpy().squeeze()
+            audio *= 255
+            audio = audio.astype(np.uint8)
+            audio = cv2.resize(audio, (256, 256))
+            images.append(audio)
+
+        compressed_images = []
+        for img in images:
+            compressed_image_msg = self.bridge.cv2_to_compressed_imgmsg(img)
+            compressed_images.append(compressed_image_msg)
+
+        compressed_images_msg = CompressedImage()
+        compressed_images_msg.format = "jpeg"
+        compressed_images_msg.data = np.array([compressed_image_msg.data for compressed_image_msg in compressed_images])
+        
+        self.inputs_pub.publish(compressed_images_msg)
+
+
+    def subscribe_inputs(self, data):
+        try:
+            # Convert the compressed image data to a numpy array
+            data = np.frombuffer(data.data, np.uint8)
+            # Decode the compressed images
+            images = []
+            idx = 0
+            while idx < len(data):
+                # Read the length of the next compressed image
+                length = int.from_bytes(data[idx:idx+4], byteorder='little')
+                idx += 4
+                # Extract the compressed image data
+                img_data = data[idx:idx+length]
+                idx += length
+                # Decompress the image
+                img = cv2.imdecode(img_data, cv2.IMREAD_COLOR)
+                images.append(img)
+            
+            # Process the images (e.g., display or save them)
+            for i, img in enumerate(images):
+                cv2.imshow("Image {}".format(i), img)
+            cv2.waitKey(1000)  # Adjust the delay as needed
+
+            inputs = {
+                'audio': [],
+                'video': [],
+            } 
+
+            for i in range(self.num_stack):
+                img = images[i]
+                img = cv2.resize(img, (self.image_shape[0], self.image_shape[1]))
+                img = img.astype(np.float32) / 255
+                inputs['video'].append(img)
+            if self.use_audio:
+                audio = images[self.num_stack]
+                audio = cv2.resize(audio, (self.audio_shape[0], self.audio_shape[1]))  # TODO audio shape not defined
+                audio = audio.astype(np.float32) / 255
+                inputs['audio'] = audio
+
+            # Call execute action with the inputs
+
+        except Exception as e:
+            rospy.logerr("Error decoding images: %s", e)
+
 
     def execute_action(self, hist_actions=[]):
         # lift, extension, lateral, roll, gripper
