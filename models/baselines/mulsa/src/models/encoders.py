@@ -49,6 +49,7 @@ class Encoder(nn.Module):
         self.vision_activations = None
 
     def forward(self, x):
+        print("x",x.shape)
         x = self.coord_conv(x)
         x = self.feature_extractor(x)
         assert len(x.values()) == 1
@@ -178,7 +179,7 @@ def make_audio_encoder(out_dim=None, norm_audio=False, model="spec"):
 if __name__ == "__main__":
     inp = torch.zeros((1, 3, 480, 640))
     encoder = make_vision_encoder(64, 1280)
-    print(encoder(inp).shape)
+    # print(encoder(inp).shape)
     # episode_folder = "/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/30"
     # audio_encoder = make_audio_encoder(256*6, model="ast")
     # audio_gripper1 = sf.read(os.path.join(episode_folder, "processed_audio.wav"))[0]

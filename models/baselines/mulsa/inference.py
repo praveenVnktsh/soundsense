@@ -24,7 +24,7 @@ class MULSAInference(pl.LightningModule):
         a_encoder = make_audio_encoder(self.config['encoder_dim'] * self.config['num_stack'], self.config['norm_audio'])
         self.use_audio = "ag" in self.config["modalities"].split("_")
         self.actor = Actor(v_encoder, a_encoder, self.config)
-        self.loss_cce = torch.nn.CrossEntropyLoss(weight= torch.tensor([1]*11))
+        self.loss_cce = torch.nn.CrossEntropyLoss(weight= torch.tensor([1]*8))
         self.num_stack = self.config['num_stack']
         print("NUM STACK: ", self.num_stack)
         # self.transform_image = A.Compose([

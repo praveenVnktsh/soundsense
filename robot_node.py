@@ -43,18 +43,13 @@ class RobotNode:
             audio_sub = rospy.Subscriber('/audio/audio', AudioData, self.callback)
             print("Waiting for audio data...")
             # rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
-            self.mel = torchaudio.transforms.MelSpectrogram(
-                sample_rate=self.hz, 
-                n_fft=512, 
-                hop_length=int(self.hz * 0.01), 
-                n_mels=64
-            )
+            self.audio_processor = AudioProcessor(config)
         self.cap  = cv2.VideoCapture(cam)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.model = model
 
-        self.seq_len = params['output_sequence_length']
-        self.output_dim = params['action_dim']
+        self.seq_len = config['output_sequence_length']
+        self.output_dim = config['action_dim']
         self.temp_ensemble = False
 
         idx = [0]
@@ -70,7 +65,7 @@ class RobotNode:
         self.inputs_pub = rospy.Publisher('/model_inputs', CompressedImage, queue_size=10)
         self.inputs_sub = rospy.Subscriber('/model_inputs', CompressedImage, self.subscribe_inputs)
         self.bridge = CvBridge()
-        self.audio_processor = AudioProcessor(config)
+        
 
     
     def callback(self, data):
@@ -184,10 +179,11 @@ class RobotNode:
                 temp /= temp.max()
                 temp *= 255
                 temp = temp.astype(np.uint8)
+                temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
                 temp = cv2.resize(temp, stacked.shape[:2][::-1])
-                temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
-                temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
-                stacked = np.vstack([stacked, temp])
+                # temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
+                print(temp.min(), temp.max())
+                stacked = np.vstack([(stacked * 255).astype(np.uint8), temp])
 
             cv2.imshow('stacked', stacked)
             cv2.waitKey(1)
@@ -330,53 +326,74 @@ class RobotNode:
         #         m - close gripper
         #         n - open gripper
         #     """)
+        # mapping = {
+        #     'w': 0, 
+        #     's': 1,
+        #     'a': 2,
+        #     'd': 3,
+        #     'n': 4,
+        #     'm': 5,
+        #     'i': 6,
+        #     'k': 7,
+        #     'j': 8,
+        #     'l': 9,
+        #     'none': 10,
+        # }
         mapping = {
-            'w': 0, 
+            'w': 0,
             's': 1,
-            'a': 2,
-            'd': 3,
-            'n': 4,
-            'm': 5,
-            'i': 6,
-            'k': 7,
-            'j': 8,
-            'l': 9,
-            'none': 10,
+            'n': 2,
+            'm': 3,
+            'k': 4,
+            'j': 5,
+            'l': 6,
+            'none': 7
         }
+
         inv_mapping = {v: k for k, v in mapping.items()}
+
 
         action_idx = torch.argmax(outputs_softmax).item()
         action_model_idx = torch.argmax(torch.nn.functional.softmax(outputs_model.squeeze(0)[0])).item()
         print("action te: ", inv_mapping[action_idx], "action:",inv_mapping[action_model_idx], "output: ", outputs)
         hist_actions.append((inv_mapping[action_idx].ljust(6), inv_mapping[action_model_idx].ljust(6)))
         big = 0.05
+        # movement_resolution = {
+        #     0: big,
+        #     1: -big,
+        #     2: big,
+        #     3: -big,
+        #     4: 50,
+        #     5: -50,
+        #     6: big,
+        #     7: -big,
+        #     8: 15 * np.pi/180,
+        #     9: -15 * np.pi/180,
+        # }
         movement_resolution = {
             0: big,
             1: -big,
-            2: big,
-            3: -big,
-            4: 50,
-            5: -50,
-            6: big,
-            7: -big,
-            8: 15 * np.pi/180,
-            9: -15 * np.pi/180,
+            2: 50,
+            3: -50,
+            4: -big,
+            5: 15 * np.pi/180,
+            6: -15 * np.pi/180,
         }
-        if action_idx in [0, 1]:
+        if inv_mapping[action_idx] in ['w', 's']:
             r.arm.move_by(movement_resolution[action_idx])
-        elif action_idx in [2, 3]:
+        elif inv_mapping[action_idx] in ['a', 'd']:
             r.base.translate_by(movement_resolution[action_idx])
-        elif action_idx in [4, 5]:
+        elif inv_mapping[action_idx] in ['n', 'm']:
             r.end_of_arm.move_by('stretch_gripper', movement_resolution[action_idx])
-        elif action_idx in [8, 9]:
+        elif inv_mapping[action_idx] in ['j', 'l']:
             r.end_of_arm.move_by('wrist_roll', movement_resolution[action_idx])
-        elif action_idx in [6, 7]:
+        elif inv_mapping[action_idx] in ['i', 'k']:
             # r.lift.move_by(movement_resolution[action_idx])
-            if action_idx == 6:
+            if inv_mapping[action_idx] == 'i':
                 r.end_of_arm.move_by('wrist_pitch', np.pi * 6/ 180.0)
             else:
                 r.end_of_arm.move_by('wrist_pitch', -np.pi * 6/ 180.0)
-        if action_idx != 10 and not self.testing:
+        if inv_mapping[action_idx] != 'none' and not self.testing:
             r.push_command()
 
         return hist_actions
