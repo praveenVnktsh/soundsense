@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 import rospy
 from std_msgs.msg import String
+import pyrealsense2 as rs
 keypress = None
 def on_press(key):
     global keypress
@@ -26,21 +27,35 @@ class Collector():
         listener.start()
         self.stop = False
         self.cap =cv2.VideoCapture('/dev/video6', cv2.CAP_V4L2)
-        self.file = open(Data_PATH + f'/{run_id}/keyboard_teleop.txt', 'w')
-        # while not self.cap.isOpened():
-        #     # self.cap = cv2.VideoCapture(camera_idx)
-        #     print('Failed top open camera')
-        #     exit()
+        while not self.cap.isOpened():
+            # self.cap = cv2.VideoCapture(camera_idx)
+            print('Failed top open camera')
+            exit()
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
+        # self.pipeline = rs.pipeline()
+        # config = rs.config()
+        # pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
+        # pipeline_profile = config.resolve(pipeline_wrapper)
+        # device = pipeline_profile.get_device()
+        # device_product_line = str(device.get_info(rs.camera_info.product_line))
+        # config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+        # self.pipeline.start(config)
+        
+        # print(device)
+        self.file = open(Data_PATH + f'/{run_id}/keyboard_teleop.txt', 'w')
+        
 
     def reset(self):
 
-        self.robot.arm.move_to(0.0)
+        self.robot.arm.move_to(0.25)
         self.robot.lift.move_to(1.075)
         self.robot.end_of_arm.move_to('wrist_pitch', 0.0)
         self.robot.end_of_arm.move_to('wrist_yaw', 0.0)
         self.robot.end_of_arm.move_to('stretch_gripper', 100)
         self.robot.end_of_arm.move_to('wrist_roll', 0.0)
+        self.robot.head.move_to('head_pan', -np.pi/2)
+        self.robot.head.move_to('head_tilt', -np.pi/6)
         self.robot.push_command()
         time.sleep(3)
 
@@ -53,8 +68,14 @@ class Collector():
         time = datetime.datetime.now().strftime("%s%f")
         delta_trans = 0.05
         delta_rad = np.pi * 6/ 180.0
-        ret, frame = self.cap.read()
         self.file.write(time + '\t' + c + '\n')
+
+
+        # frames = self.pipeline.wait_for_frames()
+        # color_frame = frames.get_color_frame()
+        # if color_frame is not None:
+        #     frame = np.asanyarray(color_frame.get_data())
+        ret, frame = self.cap.read()
         if frame is not None:
             pathFolder = Data_PATH + '/' + str(run_id) + '/' + 'video/' + str(time) + '.png'
             frame = cv2.resize(frame, (0, 0), fx = 0.5, fy = 0.5)

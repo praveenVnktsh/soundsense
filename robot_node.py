@@ -14,6 +14,7 @@ from models.audio_processor import AudioProcessor
 
 class RobotNode:
     def __init__(self, config_path, model, testing= False):
+        rospy.init_node("test_model")
         self.r = stretch_body.robot.Robot()
         self.boot_robot()
 
@@ -41,7 +42,7 @@ class RobotNode:
         if self.use_audio:
             audio_sub = rospy.Subscriber('/audio/audio', AudioData, self.callback)
             print("Waiting for audio data...")
-            rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
+            # rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
             self.mel = torchaudio.transforms.MelSpectrogram(
                 sample_rate=self.hz, 
                 n_fft=512, 
@@ -49,11 +50,12 @@ class RobotNode:
                 n_mels=64
             )
         self.cap  = cv2.VideoCapture(cam)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.model = model
 
-        self.seq_len = 10
-        self.output_dim = 11
-        self.temp_ensemble = True
+        self.seq_len = params['output_sequence_length']
+        self.output_dim = params['action_dim']
+        self.temp_ensemble = False
 
         idx = [0]
         for i in range(1, self.seq_len):
@@ -72,18 +74,20 @@ class RobotNode:
 
     
     def callback(self, data):
+        # print("GETING DATA")
         audio = np.frombuffer(data.data, dtype=np.int16).copy().astype(np.float64)
         audio /= 32768
         audio = audio.tolist()
         self.history['audio']+= (audio)
+        # print(len(self.history['audio']), self.audio_n_seconds * self.hz, len(data.data))
         if len(self.history['audio']) > self.audio_n_seconds * self.hz:
             self.history['audio'] = self.history['audio'][-self.audio_n_seconds * self.hz:]
 
     def boot_robot(self,):
         r = self.r
         if not r.startup():
-                print("Failed to start robot")
-                exit() # failed to start robot!
+            print("Failed to start robot")
+            exit() # failed to start robot!
         if not r.is_homed():
             print("Robot is not calibrated. Do you wish to calibrate? (y/n)")
             if input() == "y":
@@ -92,15 +96,24 @@ class RobotNode:
                 print("Exiting...")
                 exit()
 
-        r.lift.move_to(0.9)
-        r.arm.move_to(0.2)
-        r.end_of_arm.move_to('wrist_yaw', 0.0)
-        r.end_of_arm.move_to('wrist_pitch', 0.0)
-        r.end_of_arm.move_to('wrist_roll', 0.0)
-        r.end_of_arm.move_to('stretch_gripper', 100)
-        r.push_command()
-        r.lift.wait_until_at_setpoint()
-        r.arm.wait_until_at_setpoint()
+        # r.lift.move_to(0.9)
+        # r.arm.move_to(0.2)
+        # r.end_of_arm.move_to('wrist_yaw', 0.0)
+        # r.end_of_arm.move_to('wrist_pitch', 0.0)
+        # r.end_of_arm.move_to('wrist_roll', 0.0)
+        # r.end_of_arm.move_to('stretch_gripper', 100)
+        # r.push_command()
+        # r.lift.wait_until_at_setpoint()
+        # r.arm.wait_until_at_setpoint()
+        self.r.arm.move_to(0.25)
+        self.r.lift.move_to(1.075)
+        self.r.end_of_arm.move_to('wrist_pitch', 0.0)
+        self.r.end_of_arm.move_to('wrist_yaw', 0.0)
+        self.r.end_of_arm.move_to('stretch_gripper', 100)
+        self.r.end_of_arm.move_to('wrist_roll', 0.0)
+        self.r.head.move_to('head_pan', -np.pi/2)
+        self.r.head.move_to('head_tilt', -np.pi/6)
+        self.r.push_command()
         time.sleep(5)
         print("Robot ready to run model.")
     
@@ -172,6 +185,7 @@ class RobotNode:
                 temp *= 255
                 temp = temp.astype(np.uint8)
                 temp = cv2.resize(temp, stacked.shape[:2][::-1])
+                temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
                 temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
                 stacked = np.vstack([stacked, temp])
 
@@ -271,7 +285,7 @@ class RobotNode:
         inputs = self.generate_inputs()
         starttime = time.time()
         outputs = self.model(inputs) # 11 dimensional
-        print("Time to run model: ", time.time() - starttime)
+        # print("Time to run model: ", time.time() - starttime)
         outputs_model = outputs.clone()
         if self.temp_ensemble:
             outputs = outputs.squeeze(0).detach().numpy()
@@ -302,6 +316,20 @@ class RobotNode:
 
         # m - close gripper
         # n - open gripper
+
+        # print("""
+        #         w - extend arm
+        #         s - retract arm
+
+        #         i - pitch up
+        #         k - pitch down
+
+        #         l - roll right
+        #         j - roll left
+
+        #         m - close gripper
+        #         n - open gripper
+        #     """)
         mapping = {
             'w': 0, 
             's': 1,
@@ -343,7 +371,11 @@ class RobotNode:
         elif action_idx in [8, 9]:
             r.end_of_arm.move_by('wrist_roll', movement_resolution[action_idx])
         elif action_idx in [6, 7]:
-            r.lift.move_by(movement_resolution[action_idx])
+            # r.lift.move_by(movement_resolution[action_idx])
+            if action_idx == 6:
+                r.end_of_arm.move_by('wrist_pitch', np.pi * 6/ 180.0)
+            else:
+                r.end_of_arm.move_by('wrist_pitch', -np.pi * 6/ 180.0)
         if action_idx != 10 and not self.testing:
             r.push_command()
 

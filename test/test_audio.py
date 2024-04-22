@@ -17,6 +17,7 @@ def callback(data):
         starttime = time.time()
     audio = np.frombuffer(data.data, dtype=np.int16).tolist()
     buffer += (audio.copy())
+    # print(len(buffer))
 
 rospy.init_node("temp")
 audio_sub = rospy.Subscriber('/audio/audio', AudioData, callback)

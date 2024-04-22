@@ -41,6 +41,7 @@ def callBackEndRecording(data: String):
 			wf.setsampwidth(2)  
 			wf.setframerate(16000)
 			origbuf = np.array(buffer.copy(), dtype = np.int16)
+			print("Time of buffer: ", len(buffer) / 16000)
 			wf.writeframes(origbuf.tobytes())
 
 buffer = []
@@ -52,13 +53,15 @@ def callback( data):
 		# audio = audio.tolist()
 		audio = np.frombuffer(data.data, dtype=np.int16).tolist()
 		buffer += (audio.copy())
-
+reccord = False
+path = None
 audio_sub = rospy.Subscriber('/audio/audio', AudioData, callback)
+rospy.wait_for_message('/audio/audio', AudioData)
 
 sub = rospy.Subscriber('end_recording', String, callBackEndRecording)
 
-reccord = False
-path = None
+
+
 
 if __name__ == '__main__':
 
