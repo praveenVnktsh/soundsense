@@ -15,7 +15,7 @@ from models.audio_processor import AudioProcessor
 import json
 
 class RobotNode:
-    def __init__(self, config_path, model, testing= False):
+    def __init__(self, config_path, testing= False):
         rospy.init_node("test_model")
         self.r = stretch_body.robot.Robot()
         self.boot_robot()
@@ -44,7 +44,6 @@ class RobotNode:
             # rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
         self.cap  = cv2.VideoCapture(cam)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        self.model = model
 
         self.seq_len = config['output_sequence_length']
         self.output_dim = config['action_dim']
