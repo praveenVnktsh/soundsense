@@ -10,6 +10,16 @@ import torchaudio
 from tqdm import trange
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import numpy as np
+import random
+
+seed = 42
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(seed)
+
 
 class ESC50Dataset(Dataset):
     def __init__(self, metadata_file, data_path, transform=None):
@@ -35,44 +45,65 @@ class ESC50Dataset(Dataset):
         label = self.metadata.iloc[idx]['target']
         
         return waveform, label
+    
+class MulsaDataset(Dataset):
+    def __init__(self, data_path, transform=None):
+        self.data_path = data_path
+        self.transform = transform
+        self.filenames = sorted(os.listdir(data_path))
 
-class CoordConv(torch.nn.Module):
-    """Add coordinates in [0,1] to an image, like CoordConv paper."""
+    def __len__(self):
+        return len(self.filenames)
 
-    def forward(self, x):
-        # needs N,C,H,W inputs
-        assert x.ndim == 4
-        h, w = x.shape[2:]
-        ones_h = x.new_ones((h, 1))
-        type_dev = dict(dtype=x.dtype, device=x.device)
-        lin_h = torch.linspace(-1, 1, h, **type_dev)[:, None]
-        ones_w = x.new_ones((1, w))
-        lin_w = torch.linspace(-1, 1, w, **type_dev)[None, :]
-        new_maps_2d = torch.stack((lin_h * ones_w, lin_w * ones_h), dim=0)
-        new_maps_4d = new_maps_2d[None]
-        assert new_maps_4d.shape == (1, 2, h, w), (x.shape, new_maps_4d.shape)
-        batch_size = x.size(0)
-        new_maps_4d_batch = new_maps_4d.repeat(batch_size, 1, 1, 1)
-        result = torch.cat((x, new_maps_4d_batch), dim=1)
-        return result
+    def __getitem__(self, idx):
+        file_name = self.filenames[idx]
+        file_path = os.path.join(self.data_path, file_name)
+        
+        # Load audio file
+        waveform, sample_rate = torchaudio.load(file_path)
+        
+        # Apply transformations if specified
+        if self.transform:
+            waveform = self.transform(waveform)
+        
+        return waveform
+
+
+def coordConv(x):
+    # needs N,C,H,W inputs
+    assert x.ndim == 4
+    h, w = x.shape[2:]
+    ones_h = x.new_ones((h, 1))
+    type_dev = dict(dtype=x.dtype, device=x.device)
+    lin_h = torch.linspace(-1, 1, h, **type_dev)[:, None]
+    ones_w = x.new_ones((1, w))
+    lin_w = torch.linspace(-1, 1, w, **type_dev)[None, :]
+    new_maps_2d = torch.stack((lin_h * ones_w, lin_w * ones_h), dim=0)
+    new_maps_4d = new_maps_2d[None]
+    assert new_maps_4d.shape == (1, 2, h, w), (x.shape, new_maps_4d.shape)
+    batch_size = x.size(0)
+    new_maps_4d_batch = new_maps_4d.repeat(batch_size, 1, 1, 1)
+    result = torch.cat((x, new_maps_4d_batch), dim=1)
+    return result
 
 class Encoder(torch.nn.Module):
     def __init__(self, feature_extractor, out_dim=None):
         super().__init__()
         self.feature_extractor = feature_extractor
-        self.coord_conv = CoordConv()
 
     def forward(self, x):
-        x = self.coord_conv(x)
+        x = coordConv(x)
         x = self.feature_extractor(x)
         return x
 
 if __name__ == "__main__":
 
-    train = True
-    evaluate = True
-    load = False
-    n_epochs = 100
+    train = False
+    evaluate = False
+    load = True
+    predict = True
+    n_epochs = 200
+    exp_name = '2'
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -85,9 +116,9 @@ if __name__ == "__main__":
 
     # Define transformations (you may need to adjust these)
     transform = torchvision.transforms.Compose([
-        T.MelSpectrogram(sample_rate=44100),
-        T.FrequencyMasking(freq_mask_param=30),
-        T.TimeMasking(time_mask_param=100)
+        T.MelSpectrogram(sample_rate=16000),
+        # T.FrequencyMasking(freq_mask_param=30),
+        # T.TimeMasking(time_mask_param=100)
     ])
 
     # Create dataset instance
@@ -121,18 +152,19 @@ if __name__ == "__main__":
     # Train test split
     train_size = int(0.8 * len(dataset))
     test_size = len(dataset) - train_size
-    torch.random.manual_seed(0)
+    # torch.random.manual_seed(0)
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
     # Create train and test dataloaders
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=False)
     if train:
+        print("Training")
 
         # Train model using train_dataloader
         model.train()
         criterion = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
         train_hist = []
         for epoch in range(n_epochs):
             for i, (waveform, label) in tqdm(enumerate(train_dataloader)):
@@ -157,14 +189,31 @@ if __name__ == "__main__":
 
 
         # Save model weights
-        torch.save(model.state_dict(), "/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/pretrained/esc_pretrained.pth")
+        torch.save(model.feature_extractor.state_dict(), "/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/pretrained/esc_pretrained_"+exp_name+".pth")
     if evaluate:
+        print("Evaluating")
+        model.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for waveform, label in test_dataloader:
+                waveform = waveform.to(device)
+                label = label.to(device)
+                output = model(waveform)
+                _, predicted = torch.max(output.data, 1)
+                total += label.size(0)
+                correct += (predicted == label).sum().item()
+        print(f"Accuracy before load: {100 * correct / total}%")
+
+
+
         if load:
+            model = Encoder(feature_extractor)
             # Load ResNet18 model
 
             # Load state dictionary
-            state_dict = torch.load("/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/pretrained/esc_pretrained.pth")
-            model.load_state_dict(state_dict)
+            state_dict = torch.load("/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/pretrained/esc_pretrained_"+exp_name+".pth")
+            model.feature_extractor.load_state_dict(state_dict)
         # Evaluate accuracy on test dataloader
         model.eval()
         correct = 0
@@ -178,4 +227,23 @@ if __name__ == "__main__":
                 total += label.size(0)
                 correct += (predicted == label).sum().item()
         print(f"Accuracy: {100 * correct / total}%")
+    if predict:
+        print("Predicting")
+        data_path = "/home/punygod_admin/SoundSense/soundsense/predicted/audio/"
+        mulsa_dataset = MulsaDataset(data_path, transform=transform)
+        mulsa_dataloader = torch.utils.data.DataLoader(mulsa_dataset, batch_size=1, shuffle=False)
+        if load:
+            model = Encoder(feature_extractor)
+            state_dict = torch.load("/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/pretrained/esc_pretrained_"+exp_name+".pth")
+            model.feature_extractor.load_state_dict(state_dict)
+        model.eval()
+        preds = []
+        with torch.no_grad():
+            for waveform in tqdm(mulsa_dataloader):
+                waveform = waveform.to(device)
+                output = model(waveform)
+                _, predicted = torch.max(output.data, 1)
+                preds.append(predicted.detach().cpu().numpy())
+        np.savetxt("/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/pretrained/preds_"+exp_name+".txt", np.array(preds), fmt="%d")
+
 

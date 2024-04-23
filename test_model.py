@@ -6,7 +6,7 @@ from audio_common_msgs.msg import AudioDataStamped, AudioData
 from robot_node import RobotNode
 import yaml
 import torch
-from robot_node_test_with_gt import RobotNode
+from robot_node import RobotNode
 
 
 if __name__ == "__main__":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # model_root += "imi_vg_lstm_seqlen_10_mha_spec04-20-07:32:19"
     # model_root += "sorting_imi_vg_lstm_seqlen_3_mha_spec04-21-21:13:43"
     # model_root += "sorting_imi_vg_lstm_seqlen_3_spec04-22-00:48:38"
-    model_root += "sorting_imi_vg_ag_lstm_seqlen_3_spec04-22-21:39:20"
+    model_root += "sorting_imi_vg_ag_simple_seqlen_1_spec04-22-17:19:32"
     model_root += '/'
     model_name = 'last.ckpt'
     # model_name = '04-09-15:48:16-v1.ckpt'

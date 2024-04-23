@@ -49,7 +49,7 @@ class Encoder(nn.Module):
         self.vision_activations = None
 
     def forward(self, x):
-        print("x",x.shape)
+        # print("x",x.shape)
         x = self.coord_conv(x)
         x = self.feature_extractor(x)
         assert len(x.values()) == 1

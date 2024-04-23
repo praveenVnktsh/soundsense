@@ -45,6 +45,11 @@ def main(config):
 
     print("Train episodes: ", len(train_episodes))
     print("Val episodes: ", len(val_episodes))
+    config['train_episodes'] = train_episodes
+    config['val_episodes'] = val_episodes
+    print(train_episodes)
+    # exit()
+
 
     train_set = torch.utils.data.ConcatDataset(
         [
