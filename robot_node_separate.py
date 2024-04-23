@@ -170,6 +170,7 @@ class RobotNode:
 
 
         rate = rospy.Rate(loop_rate)
+        last_exec_time = time.time()
         while is_run:
             start_time = time.time()
             frame = self.get_image()
@@ -182,7 +183,9 @@ class RobotNode:
                     self.history['timestamps'] = self.history['timestamps'][1:]
             
             if time.time() - loop_start_time > self.audio_n_seconds + 1: # warmup
-                self.generate_inputs()
+                if (time.time() - last_exec_time) > 1/loop_rate:
+                    self.generate_inputs()
+                last_exec_time = time.time()
                 
             # rate.sleep()
             print(time.time() - start_time, len(self.history['video']), len(self.history['audio']))

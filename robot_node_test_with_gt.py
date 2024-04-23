@@ -11,6 +11,7 @@ import glob
 import soundfile as sf
 import torchaudio
 from PIL import Image
+from models.audio_processor import AudioProcessor
 class RobotNode:
     def __init__(self, config_path, model, is_unimodal = False, testing = False):
         # self.r = stretch_body.robot.Robot()
@@ -32,21 +33,16 @@ class RobotNode:
             'audio': [0] * self.hz * self.audio_n_seconds,
             'video': [],
         }
-        self.run_id = '129'
+        self.run_id = '30'
         if not is_unimodal:
-            data = sf.read(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized/{self.run_id}/processed_audio.wav')[0]
+            data = sf.read(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/sorting/{self.run_id}/processed_audio.wav')[0]
             # data = sf.read(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/processed_audio.wav')[0]
             self.total_audio = torchaudio.functional.resample(torch.tensor(data), 48000, 16000).numpy()
-            self.mel = torchaudio.transforms.MelSpectrogram(
-                sample_rate=self.hz, 
-                n_fft=512, 
-                hop_length=int(self.hz * 0.01), 
-                n_mels=64
-            )
+            self.audio_processor = AudioProcessor(params)
         self.idx = 0
         self.model = model
         self.output_sequence_length = params['output_sequence_length']
-        self.images = sorted(glob.glob(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data_resized/{self.run_id}/video/*.png'))
+        self.images = sorted(glob.glob(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/sorting/{self.run_id}/video/*.png'))
         # self.images = sorted(glob.glob(f'/home/hello-robot/soundsense/soundsense/stretch/data/data_two_cups/{run_id}/video/*.png'))
         import json
         with open(f'/home/punygod_admin/SoundSense/soundsense/data/mulsa/data/{self.run_id}/actions.json', 'r') as f:
@@ -159,18 +155,28 @@ class RobotNode:
         # print(inputs["video"][0].max(), inputs["video"][0].min(), inputs["video"][0].mean())
         outputs = self.model(inputs).squeeze(0) # [b, seqlen, 11]
         mapping = {
-            'w': 0, 
+            'w': 0,
             's': 1,
-            'a': 2,
-            'd': 3,
-            'n': 4,
-            'm': 5,
-            'i': 6,
-            'k': 7,
-            'j': 8,
-            'l': 9,
-            'none': 10,
+            'n': 2,
+            'm': 3,
+            'k': 4,
+            'j': 5,
+            'l': 6,
+            'none': 7
         }
+        # mapping = {
+        #     'w': 0, 
+        #     's': 1,
+        #     'a': 2,
+        #     'd': 3,
+        #     'n': 4,
+        #     'm': 5,
+        #     'i': 6,
+        #     'k': 7,
+        #     'j': 8,
+        #     'l': 9,
+        #     'none': 10,
+        # }
         inv_mapping = {v: k for k, v in mapping.items()}
         # print("model output shape", outputs.shape)
         actions = []
@@ -203,15 +209,7 @@ class RobotNode:
         if self.use_audio:
             audio = self.history['audio'].copy()
             audio = torch.tensor(audio).float()
-            audio = audio.unsqueeze(0).unsqueeze(0)
-            mel = self.mel(audio)
-            eps = 1e-8
-            mel = np.log(mel + eps)
-            
-            # print((audio).numel() / self.hz)
-            # print(audio.max(), audio.min(), audio.mean(), mel.max(), mel.min(), mel.mean())
-            if self.norm_audio:
-                mel /= mel.sum(dim = -2, keepdim = True)
+            mel = self.audio_processor.process(audio, 0, audio.size(-1))
             
         # print(len(video))
         if save:
