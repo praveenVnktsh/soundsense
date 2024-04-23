@@ -116,7 +116,11 @@ if __name__ == "__main__":
 
     # Define transformations (you may need to adjust these)
     transform = torchvision.transforms.Compose([
-        T.MelSpectrogram(sample_rate=16000),
+        T.MelSpectrogram(sample_rate=16000,
+                        n_fft=512, 
+                        hop_length=int(16000* 0.01), 
+                        n_mels=64
+                        ),
         # T.FrequencyMasking(freq_mask_param=30),
         # T.TimeMasking(time_mask_param=100)
     ])
@@ -241,6 +245,7 @@ if __name__ == "__main__":
         with torch.no_grad():
             for waveform in tqdm(mulsa_dataloader):
                 waveform = waveform.to(device)
+                print("waveform shape", waveform.shape)
                 output = model(waveform)
                 _, predicted = torch.max(output.data, 1)
                 preds.append(predicted.detach().cpu().numpy())

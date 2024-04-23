@@ -1,0 +1,1 @@
+docker run -it --network="host" --mount type=bind,source="$(pwd)",target=/home/soundsense mmml:ros-noetic

@@ -2,6 +2,11 @@
 # generated from docker_images/create_ros_image.Dockerfile.em
 FROM ros:noetic-ros-base-focal
 
+LABEL com.nvidia.volumes.needed="nvidia_driver"
+ENV PATH /usr/local/nvidia/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+
+
 # install ros packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-noetic-robot=1.5.0-1* \
@@ -10,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN set -xe \
     && apt-get update \
     && apt-get install -y python3-pip
+
 
 RUN pip install pytorch-lightning
 RUN pip install torchvision
@@ -26,6 +32,3 @@ RUN pip install albumentations
 RUN pip install configargparse
 
 RUN apt-get install -y ros-noetic-audio-common
-
-
-

@@ -90,8 +90,9 @@ class MULSAInference(pl.LightningModule):
             temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
             stacked = np.vstack([stacked, temp])
 
-        cv2.imshow('stacked', stacked)
-        cv2.waitKey(1)
+        # cv2.imshow('stacked', stacked)
+        # cv2.waitKey(1)
+
 
         images = [image[:, i * self.w : (i + 1) * self.w]/255.0 for i in range(self.num_stack)]
         out = self.forward({"video": images, "audio": mel})
@@ -103,6 +104,7 @@ class MULSAInference(pl.LightningModule):
         sequence = np.array(sequence, dtype = np.int32)
         msg = String(data=json.dumps(sequence.tolist()))
         self.data_pub.publish(msg)
+        print("published")
 
     def forward(self, inp):
 
@@ -129,7 +131,7 @@ if __name__ == "__main__":
     parser = configargparse.ArgumentParser()
     parser.add_argument("--model_name", required=True)
     args = parser.parse_args()
-    model_root = "/home/hello-robot/soundsense/soundsense/models/baselines/mulsa/trained_models/"
+    model_root = "/home/soundsense/models/baselines/mulsa/lightning_logs/"
     model_root += args.model_name
     model_root += '/'
     model_name = 'last.ckpt'
@@ -140,7 +142,7 @@ if __name__ == "__main__":
     model.load_state_dict(
         torch.load(
             model_root + model_name,
-            map_location=torch.device("cpu"),
+            map_location=torch.device("cuda"),
         )['state_dict']
     )
     model.eval()
