@@ -2,3 +2,4 @@ temp/
 *.png
 *tfevents*
 old_logs/
+trained_models_bak/

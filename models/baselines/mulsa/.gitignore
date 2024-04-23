@@ -4,3 +4,4 @@ experiments/
 lightning_logs/
 trained_models/
 pretrained/
+trained_models_new/
