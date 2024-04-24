@@ -2,10 +2,14 @@
 # generated from docker_images/create_ros_image.Dockerfile.em
 FROM ros:noetic-ros-base-focal
 
-LABEL com.nvidia.volumes.needed="nvidia_driver"
-ENV PATH /usr/local/nvidia/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+RUN apt-get update && apt-get install -y curl
+RUN curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
 
+# ARG distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+RUN curl -s -L https://nvidia.github.io/nvidia-docker/ubuntu20.04/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+RUN sudo apt-get update
+RUN sudo apt-get install -y nvidia-docker2
+RUN sudo apt-get install -y nvidia-container-toolkit
 
 # install ros packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
