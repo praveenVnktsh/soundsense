@@ -26,7 +26,7 @@ if __name__ == "__main__":
     robot = RobotNode(
         config_path = model_root + "hparams.yaml",
         testing = True,
-        
+        model = model,
     )
 
     robot.run_loop(True)

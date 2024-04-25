@@ -14,8 +14,9 @@ Identify the name of the docker container in the NAMES column
 - source /opt/ros/noetic/setup.bash
 
 To check if server and robot are communicating
-- rostopic pub -r 10 my_topic std_msgs/String "hello there"
-
+```
+rostopic pub -r 10 my_topic std_msgs/String "hello there"
+```
 Run the inference code
 - cd /home/soundsense/
 - python3 models/baselines/mulsa/inference_ros.py
@@ -27,7 +28,6 @@ export ROS_MASTER_URI=http://172.26.32.75:11311/ && export ROS_HOSTNAME=172.26.3
 ```
 
 for robot
-
 ```
 export ROS_MASTER_URI=http://172.26.32.75:11311/ && export ROS_HOSTNAME=172.26.163.219
 ```
