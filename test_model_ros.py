@@ -42,7 +42,7 @@ if __name__ == "__main__":
         config_path = model_root + "hparams.yaml",
         model_name = model_name + '/' + ckptname,
         testing = True,
-        
+        model = model,
     )
 
     robot.run_loop(True)

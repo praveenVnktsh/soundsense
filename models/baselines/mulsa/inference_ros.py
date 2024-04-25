@@ -2,7 +2,8 @@ import torch
 torch.set_num_threads(1)
 import numpy as np
 import sys
-sys.path.append("")
+sys.path.append("/home/soundsense/models/")
+sys.path.append("/home/soundsense/")
 from models.baselines.mulsa.src.models.encoders import (
     make_vision_encoder,
     make_audio_encoder,
@@ -28,35 +29,51 @@ sys.path.append('/home/soundsense/soundsense/models/')
 from audio_processor import AudioProcessor
 import cv2
 class MULSAInference(pl.LightningModule):
-    def __init__(self, config_path):
+    def __init__(self):
         rospy.init_node('model')
         super().__init__()
-        with open(config_path) as info:
-            self.config = yaml.load(info.read(), Loader=yaml.FullLoader) 
-        v_encoder = make_vision_encoder(self.config['encoder_dim'])
-        a_encoder = make_audio_encoder(self.config['encoder_dim'] * self.config['num_stack'], self.config['norm_audio'])
-        self.use_audio = "ag" in self.config["modalities"].split("_")
-        self.actor = Actor(v_encoder, a_encoder, self.config)
-        self.loss_cce = torch.nn.CrossEntropyLoss(weight= torch.tensor([1]*8))
-        self.num_stack = self.config['num_stack']
-        print("NUM STACK: ", self.num_stack)
         self.transform_image = A.Compose([           
                 A.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225], max_pixel_value= 1.0),
                 ToTensorV2(),
             ]
         )
+        self.model_loaded = False
+
+    def load_model(self, data):
+        print("Received model load request from ", data.data)
+        data = data.data
+        model_root = "/home/soundsense/models/baselines/mulsa/lightning_logs/"
+        dirp, model_name= data.split('/')
+        model_root += dirp + '/'#contains ckpt as well 
+        config_path = model_root + "hparams.yaml"
+
+        with open(config_path) as info:
+            self.config = yaml.load(info.read(), Loader=yaml.FullLoader) 
+
+        v_encoder = make_vision_encoder(self.config['encoder_dim'])
+        a_encoder = make_audio_encoder(self.config['encoder_dim'] * self.config['num_stack'], self.config['norm_audio'])
+        self.use_audio = "ag" in self.config["modalities"].split("_")
+        self.actor = Actor(v_encoder, a_encoder, self.config)
+        self.num_stack = self.config['num_stack']
+        self.loss_cce = torch.nn.CrossEntropyLoss(weight= torch.tensor([1]*self.config['action_dim']))
 
         self.audio_processor = AudioProcessor(self.config)
         
-        
         self.h = self.config['resized_height_v']
         self.w = self.config['resized_width_v']
-        print("height: ", self.h)
-        print("width: ", self.w)
-        print("Model loaded")
+        self.load_state_dict(
+            torch.load( 
+                model_root + model_name,
+                map_location=torch.device("cuda"),
+            )['state_dict']
+        )
+        self.model_loaded = True
+        
+        print("Model loaded", model_name)
         
     def start_pub_sub(self):
+        self.model_sub = rospy.Subscriber("/load_model", String, self.load_model)
         self.data_pub = rospy.Publisher("/model_outputs", String, queue_size=10)
         data_sub = message_filters.TimeSynchronizer(
             [
@@ -66,9 +83,12 @@ class MULSAInference(pl.LightningModule):
             queue_size=2,
         )
         data_sub.registerCallback(self.process)
-        print("waiting for images")
+        print("Pub sub started!")
 
     def process(self, image, audio):
+        if not self.model_loaded:
+            print("Model not loaded. sorry")
+            return
         image = np.frombuffer(image.data, dtype=np.uint8).reshape(image.height, image.width, -1)
         if self.use_audio:
             audio = np.frombuffer(audio.audio.data, dtype=np.int16).astype(np.float32)
@@ -130,22 +150,11 @@ class MULSAInference(pl.LightningModule):
 
 if __name__ == "__main__":
     parser = configargparse.ArgumentParser()
-    parser.add_argument("--model_name", required=True)
-    args = parser.parse_args()
-    model_root = "/home/soundsense/soundsense/models/baselines/mulsa/lightning_logs/"
-    model_root += args.model_name
-    model_root += '/'
-    model_name = 'last.ckpt'
-
-    model = MULSAInference(
-        config_path = model_root + "hparams.yaml",
-    )
-    model.load_state_dict(
-        torch.load(
-            model_root + model_name,
-            map_location=torch.device("cuda"),
-        )['state_dict']
-    )
+    
+    
+#  config_path = model_root + "hparams.yaml",
+    model = MULSAInference()
+    
     model.eval()
 
     model.start_pub_sub()
