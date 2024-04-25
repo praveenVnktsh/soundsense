@@ -100,14 +100,16 @@ if __name__ == "__main__":
                         choices=['layered', 'multi_head', 'lstm', 'simple'], required=True)
     parser.add_argument("--use_audio", action='store_true', help="Use audio")
     parser.add_argument('--output_sequence_length', type=int, required=True, help='Output sequence length')
-    parser.add_argument('--audio_len', type=int, help='Output sequence length')
-    parser.add_argument('--audio_encoder', type=str, default='spec', help='Audio encoder', choices=['spec', 'ast', 'hubert'])
-    
+    parser.add_argument('--audio_len', type=int, default=5, help='Output sequence length')
+    parser.add_argument('--audio_encoder', type=str, default='spec', help='Audio encoder', choices=['spec', 'ast', 'hubert',"spec_pretrained"])
+    parser.add_argument('--num_stack', type=int, default=6, help='Number of stacked frames')
     args = parser.parse_args()
     
 
     with open(args.config_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
+
+    config.update(vars(args))
 
     config['use_mha'] = args.mha
     config['decoder_type'] = args.decoder
@@ -124,6 +126,8 @@ if __name__ == "__main__":
     if config['use_mha']:
         config['exp_name'] += '_mha'
     config['exp_name'] += "_"+config['audio_encoder'] 
+    config['exp_name'] += "_audio_len_"+ str(config['audio_len']) 
+    config['exp_name'] += "_num_stacks_"+str(config['num_stack'])
     config['exp_name'] = config['dataset_root'].split('/')[-1] + '_' + config['exp_name']
 
     main(config)

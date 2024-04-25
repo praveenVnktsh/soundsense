@@ -24,6 +24,7 @@ from std_msgs.msg import ByteMultiArray
 from audio_common_msgs.msg import AudioDataStamped
 import sys
 sys.path.append('/home/hello-robot/soundsense/soundsense/models/')
+sys.path.append('/home/soundsense/soundsense/models/')
 from audio_processor import AudioProcessor
 import cv2
 class MULSAInference(pl.LightningModule):
@@ -72,7 +73,7 @@ class MULSAInference(pl.LightningModule):
         if self.use_audio:
             audio = np.frombuffer(audio.audio.data, dtype=np.int16).astype(np.float32)
             audio = torch.tensor(audio, dtype=torch.float32).unsqueeze(0)
-            print(audio.shape)
+            # print(audio.shape)
             mel = self.audio_processor.process(audio, 0, audio.size(-1))
         else:
             mel = None
@@ -96,7 +97,7 @@ class MULSAInference(pl.LightningModule):
 
         images = [image[:, i * self.w : (i + 1) * self.w]/255.0 for i in range(self.num_stack)]
         out = self.forward({"video": images, "audio": mel})
-        out = out.detach().numpy().squeeze(0)
+        out = out.detach().cpu().numpy().squeeze(0)
         sequence = []
         for o in out:
             sequence.append(np.argmax(o))
@@ -131,7 +132,7 @@ if __name__ == "__main__":
     parser = configargparse.ArgumentParser()
     parser.add_argument("--model_name", required=True)
     args = parser.parse_args()
-    model_root = "/home/soundsense/models/baselines/mulsa/lightning_logs/"
+    model_root = "/home/soundsense/soundsense/models/baselines/mulsa/lightning_logs/"
     model_root += args.model_name
     model_root += '/'
     model_name = 'last.ckpt'

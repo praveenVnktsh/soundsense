@@ -20,6 +20,7 @@ class CoordConv(nn.Module):
 
     def forward(self, x):
         # needs N,C,H,W inputs
+        # print("x",x.shape)
         assert x.ndim == 4
         h, w = x.shape[2:]
         ones_h = x.new_ones((h, 1))
@@ -87,7 +88,7 @@ class Spec_Encoder(Encoder):
         # assert log_spec.size(-2) == 64
         # if self.norm_audio:
         #     log_spec /= log_spec.sum(dim=-2, keepdim=True)  # [1, 64, 100]
-        x = super().forward(log_spec)
+        x = super().forward(log_spec)       # .squeeze(0) when training, remove otherwise
         self.audio_activations = x
 
         # h_a = x.register_hook(self.audio_activation_hook)
@@ -174,6 +175,19 @@ def make_audio_encoder(out_dim=None, norm_audio=False, model="spec"):
         return ASTEncoder(out_dim)
     elif model == "hubert":
         return HubertEncoder(out_dim)    
+    elif model=="spec_pretrained":
+        audio_extractor = resnet18()
+        audio_extractor.conv1 = nn.Conv2d(
+            3, 64, kernel_size=7, stride=1, padding=3, bias=False
+        )
+        audio_extractor.fc = torch.nn.Linear(512, 50)
+        
+        state_dict = torch.load("/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/pretrained/esc_pretrained_2.pth")
+        ## print keys in state_dict
+        # print(state_dict.keys())
+        audio_extractor.load_state_dict(state_dict)
+        audio_extractor = create_feature_extractor(audio_extractor, ["layer4.1.relu_1"])
+        return Spec_Encoder(audio_extractor, out_dim, norm_audio)
 
 
 if __name__ == "__main__":

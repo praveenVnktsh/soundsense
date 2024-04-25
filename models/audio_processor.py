@@ -20,7 +20,7 @@ class AudioProcessor:
         if clip_and_resample:
             audio = self.clip_and_resample(audio, audio_start, audio_end, )
         
-        mel = self.mel(audio)
+        mel = self.mel(audio.to(torch.float32))
         eps = 1e-8
         mel = np.log(mel + eps)
         if self.norm_audio:

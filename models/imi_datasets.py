@@ -1,6 +1,7 @@
 import os
 import torch
 import yaml
+import sys
 import torchvision.transforms as T
 
 import numpy as np
@@ -17,6 +18,7 @@ from albumentations.pytorch import ToTensorV2
 from transformers import AutoProcessor
 import transformers
 import cv2
+sys.path.append('/home/punygod_admin/SoundSense/soundsense/models')
 from audio_processor import AudioProcessor
 
 
@@ -205,7 +207,7 @@ class ImitationEpisode(Dataset):
         if self.audio_gripper is not None:
             audio_end = idx * self.resolution
             audio_start = audio_end - self.audio_len * self.resample_rate_audio
-            mel = self.audio_processor.process(self.audio_gripper, audio_start, audio_end)
+            mel = self.audio_processor.process(self.audio_gripper, audio_start, audio_end, clip_and_resample=True).float()
         else:
             mel = 0
  

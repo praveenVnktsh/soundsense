@@ -44,6 +44,7 @@ class Actor(torch.nn.Module):
 
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
+            print("Using GPU")
         else:
             self.device = torch.device("cpu")
 
@@ -81,8 +82,8 @@ class Actor(torch.nn.Module):
                 256, 
                 num_layers=self.lstm_hidden_layers, 
                 batch_first=True
-            )
-            self.output_head = nn.Linear(256, self.action_dim)
+            ).to(self.device)
+            self.output_head = nn.Linear(256, self.action_dim).to(self.device)
             # self.decoder_mlp = nn.Sequential(
             #     nn.Linear(self.layernorm_embed_shape//4, self.action_dim),
             #     nn.Tanh()
@@ -169,13 +170,14 @@ class Actor(torch.nn.Module):
                     out = torch.cat((out, pred.unsqueeze(1)), dim=1)
                 # out = torch.stack(outs, dim=1) # [batch, stack_future_actions_dim, action_dim]
             elif self.decoder_type == "lstm":
+                # print("Decoder device", self.device)
                 batch_size = mlp_inp.shape[0]
                 h0 = torch.zeros(self.lstm_hidden_layers, batch_size, 256).to(self.device)
                 c0 = torch.zeros(self.lstm_hidden_layers, batch_size, 256).to(self.device)
                 out = torch.tensor([]).to(self.device)
                 pred = mlp_inp.unsqueeze(1)
                 for t in range(self.output_sequence_length):
-                    pred, (h0, c0) = self.decoder(pred, (h0, c0)) # operating like a world model.
+                    pred, (h0, c0) = self.decoder(pred.cuda(), (h0, c0)) # operating like a world model.
 
                     out = torch.cat((out, self.output_head(pred.unsqueeze(1))), dim=1)
                 out = out.squeeze(2)

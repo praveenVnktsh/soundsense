@@ -28,19 +28,22 @@ def start_training(config, exp_dir, pl_module, monitor="val/loss"):
     print("DIRPATH==", dirpath)
     checkpoint = ModelCheckpoint(
         dirpath=dirpath,
+        every_n_epochs = 50,
+
+    )
+    checkpoint2 = ModelCheckpoint(
+        dirpath=dirpath,
         save_top_k=4,
         save_last=True,
         monitor=monitor,
         mode="min",
-        every_n_epochs = 50,
     )
-
     logger = TensorBoardLogger(
         save_dir=exp_dir, version=config['exp_name'] + exp_time, name="lightning_logs"
     )
     trainer = Trainer(
         max_epochs=config['epochs'],
-        callbacks=[checkpoint],
+        callbacks=[checkpoint, checkpoint2],
         default_root_dir=exp_dir,
         # gpus=-1,
         accelerator="auto",

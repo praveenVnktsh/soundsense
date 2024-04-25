@@ -43,7 +43,6 @@ class MULSAInference(pl.LightningModule):
     def forward(self, inp):
 
         video = inp["video"] #list of images
-        # print(type(video[0]))
         video = torch.stack([self.transform_image(image=img)['image'] for img in video], dim=0).to(self.device)
         video = video.unsqueeze(0)
         # print(video.shape)

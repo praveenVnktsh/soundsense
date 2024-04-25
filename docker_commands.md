@@ -1,7 +1,7 @@
 ### Instructions
 Go to ~/Soundsense/soundsense on server.
 
-Terminal 1 
+Terminal 1 w
 - docker build -t mmml:ros-noetic .
 - docker run -it --gpus all --network="host" --mount type=bind,source="$(pwd)",target=/home/soundsense mmml:ros-noetic
 - roscore

@@ -182,8 +182,22 @@ class RobotNode:
 
         if self.stacked is not None:
             self.stacked = (self.stacked * 255).astype(np.uint8)
-            cv2.putText(self.stacked, "pred:" + str(actions), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-            cv2.putText(self.stacked, "gt:   " + str(gt_actions), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            # remap = {
+            #     'w': 'f',
+            #     's': 'b',
+            #     'n': 'o',
+            #     'm': 'c',
+            #     'k': 'down',
+            #     'j': 'r',
+            #     'l': 'l',
+            #     'none': 'none'
+            # }
+            # for i in range(len(actions)):
+            #     actions[i] = remap[actions[i]]
+            #     gt_actions[i] = remap[gt_actions[i]]
+                
+            cv2.putText(self.stacked, "pr:" + str(actions), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 5)
+            cv2.putText(self.stacked, "gt:" + str(gt_actions), (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 5)
             cv2.imwrite(f'predicted/video/{self.idx}.png', self.stacked)
         return hist_actions
     def generate_inputs(self, save = True):
@@ -203,7 +217,7 @@ class RobotNode:
             
         # print(len(video))
         if save:
-            stacked = np.hstack(video)
+            stacked = np.vstack(video)
             # cv2.imwrite('stacked.jpg', stacked)
             stacked = cv2.resize(stacked,(0, 0), fx = 3, fy = 3)
             self.stacked = stacked
@@ -218,10 +232,11 @@ class RobotNode:
                 # exit()
                 temp -= temp.min()
                 temp /= temp.max()
+                temp = cv2.rotate(temp, cv2.ROTATE_90_CLOCKWISE)
                 temp = cv2.resize(temp, self.stacked.shape[:2][::-1])
                 temp = (temp * 255).astype(np.uint8)
                 temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
-                self.stacked = np.vstack([self.stacked, temp])
+                self.stacked = np.hstack([self.stacked, temp])
 
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]
@@ -229,6 +244,8 @@ class RobotNode:
         # print("Old video shape", video[0].shape, len(video))
         
         video = video[-self.n_stack_images:]
+        # print(mel.shape)
+
         # print("video shape", type(video[0]), video[0].shape, len(video))
         return {
             'video' : video, # list of images
