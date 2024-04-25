@@ -16,8 +16,16 @@ from std_msgs.msg import Header
 import json
 
 class RobotNode:
-    def __init__(self, config_path, testing= False):
+    def __init__(self, config_path, model_name, testing= False):
         rospy.init_node("test_model")
+
+        # startup model.
+        self.model_pub = rospy.Publisher("/load_model", String, queue_size=1)
+        for i in range(2):
+            self.model_pub.publish(String(data=model_name))
+            time.sleep(1)
+
+
         self.r = stretch_body.robot.Robot()
         self.boot_robot()
 
@@ -41,7 +49,8 @@ class RobotNode:
         self.use_audio = "ag" in config['modalities'].split("_")
         if self.use_audio:
             audio_sub = rospy.Subscriber('/audio/audio', AudioData, self.audio_callback)
-            # rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
+            rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
+            print("Waiting for audio")
         self.cap  = cv2.VideoCapture(cam)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
@@ -62,6 +71,7 @@ class RobotNode:
         self.image_pub = rospy.Publisher('/raw_image', Image, queue_size=1)
         self.audio_pub = rospy.Publisher('/raw_audio', AudioDataStamped, queue_size=1)
 
+        
         # make a uint8 list of actions subscriber
         self.outputs_sub = rospy.Subscriber('/model_outputs', String, self.get_model_inference)
         self.bridge = CvBridge()
@@ -183,8 +193,8 @@ class RobotNode:
                     self.history['timestamps'] = self.history['timestamps'][1:]
             
             if time.time() - loop_start_time > self.audio_n_seconds + 1: # warmup
-                if (time.time() - last_exec_time) > 1/loop_rate:
-                    self.generate_inputs()
+                # if (time.time() - last_exec_time) > 1/loop_rate:
+                self.generate_inputs()
                 last_exec_time = time.time()
                 
             # rate.sleep()
@@ -220,12 +230,11 @@ class RobotNode:
         imgmsg = self.bridge.cv2_to_imgmsg(stacked)
         imgmsg.header = header
         self.image_pub.publish(imgmsg)
-
         self.audio_pub.publish(AudioDataStamped(
             audio = AudioData(data = audio_to_send),
             header = header
         ))
-        print("published")
+        
 
 
 

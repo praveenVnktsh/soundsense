@@ -101,7 +101,13 @@ class RobotNode:
         # r.lift.wait_until_at_setpoint()
         # r.arm.wait_until_at_setpoint()
         self.r.arm.move_to(0.25)
+        self.r.push_command()
+        self.r.arm.wait_until_at_setpoint()
+
         self.r.lift.move_to(1.075)
+        self.r.push_command()
+        self.r.lift.wait_until_at_setpoint()
+        
         self.r.end_of_arm.move_to('wrist_pitch', 0.0)
         self.r.end_of_arm.move_to('wrist_yaw', 0.0)
         self.r.end_of_arm.move_to('stretch_gripper', 100)
