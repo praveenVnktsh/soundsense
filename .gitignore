@@ -24,3 +24,4 @@ baselines/playbyear/hydralogs/
 *.npy
 *.wav
 predicted*
+data_sanity/

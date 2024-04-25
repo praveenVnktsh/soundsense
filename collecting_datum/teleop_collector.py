@@ -69,8 +69,6 @@ class Collector():
         delta_trans = 0.05
         delta_rad = np.pi * 6/ 180.0
         self.file.write(time + '\t' + c + '\n')
-
-
         # frames = self.pipeline.wait_for_frames()
         # color_frame = frames.get_color_frame()
         # if color_frame is not None:
