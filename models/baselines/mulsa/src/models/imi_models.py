@@ -123,7 +123,7 @@ class Actor(torch.nn.Module):
             # batch, _, _ = audio_g.shape
             # needs N,C,H,W inputs
             # print("audio_g shape",audio_g.shape)
-            ag_embeds = self.a_encoder(audio_g.unsqueeze(0))
+            ag_embeds = self.a_encoder(audio_g)
             ag_embeds = ag_embeds.view(-1, self.layernorm_embed_shape)
             embeds.append(ag_embeds)
         
@@ -177,7 +177,7 @@ class Actor(torch.nn.Module):
                 out = torch.tensor([]).to(self.device)
                 pred = mlp_inp.unsqueeze(1)
                 for t in range(self.output_sequence_length):
-                    pred, (h0, c0) = self.decoder(pred.cuda(), (h0, c0)) # operating like a world model.
+                    pred, (h0, c0) = self.decoder(pred, (h0, c0)) # operating like a world model.
 
                     out = torch.cat((out, self.output_head(pred.unsqueeze(1))), dim=1)
                 out = out.squeeze(2)

@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # model_root += "sorting_imi_vg_lstm_seqlen_3_spec04-22-00:48:38"
     model_root += "sorting_imi_vg_ag_simple_seqlen_1_spec04-22-17:19:32"
     model_root += '/'
-    model_name = 'last.ckpt'
+    model_name = 'epoch=49-step=16050.ckpt'
     # model_name = '04-09-15:48:16-v1.ckpt'
     print("Loading hparams from ", model_root + "hparams.yaml")
     import os

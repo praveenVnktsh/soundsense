@@ -73,7 +73,7 @@ class MULSAInference(pl.LightningModule):
         print("Model loaded", model_name)
         
     def start_pub_sub(self):
-        self.model_sub = rospy.Subscriber("/load_model", String, self.load_model)
+        self.model_sub = rospy.Subscriber("/load_model", String, self.load_model,)
         self.data_pub = rospy.Publisher("/model_outputs", String, queue_size=10)
         data_sub = message_filters.TimeSynchronizer(
             [
@@ -93,8 +93,8 @@ class MULSAInference(pl.LightningModule):
         if self.use_audio:
             audio = np.frombuffer(audio.audio.data, dtype=np.int16).astype(np.float32)
             audio = torch.tensor(audio, dtype=torch.float32).unsqueeze(0)
-            # print(audio.shape)
             mel = self.audio_processor.process(audio, 0, audio.size(-1))
+            print(mel.shape)
         else:
             mel = None
 
@@ -125,7 +125,6 @@ class MULSAInference(pl.LightningModule):
         sequence = np.array(sequence, dtype = np.int32)
         msg = String(data=json.dumps(sequence.tolist()))
         self.data_pub.publish(msg)
-        print("published")
 
     def forward(self, inp):
 
@@ -135,7 +134,7 @@ class MULSAInference(pl.LightningModule):
 
         if self.use_audio:
             audio = inp["audio"]
-            x = video, audio
+            x = video, audio.unsqueeze(0)
         else:
             x = video, None
         out = self.actor(x) # tuple of 3 tensors (main output, weights, prev layer output)
@@ -149,14 +148,8 @@ class MULSAInference(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    parser = configargparse.ArgumentParser()
-    
-    
-#  config_path = model_root + "hparams.yaml",
     model = MULSAInference()
-    
     model.eval()
-
     model.start_pub_sub()
 
     rospy.spin()

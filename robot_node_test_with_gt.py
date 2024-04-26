@@ -83,6 +83,8 @@ class RobotNode:
         path = self.images[self.idx]
         frame = np.asarray(Image.open(path)).astype(np.float32) / 255.0
 
+        # frame += np.random.normal(0, 0.03, frame.shape)
+
         return frame
 
     def run_loop(self, visualize = False):
@@ -91,7 +93,7 @@ class RobotNode:
         loop_rate = 10
         
         
-        n_stack = self.n_stack_images * self.audio_n_seconds
+        n_stack = self.n_stack_images# * self.audio_n_seconds
 
         # warmup first 3 seconds
         
@@ -104,9 +106,10 @@ class RobotNode:
         while is_run:
             frame = self.get_image()
             self.history['video'].append(frame)
-            if frame is not None or self.idx % 5 == 0:
+            if frame is not None:
                 if len(self.history['video']) < n_stack:
                     continue
+
                 if len(self.history['video']) > n_stack:
                     self.history['video'] = self.history['video'][-n_stack:]
 
@@ -117,18 +120,14 @@ class RobotNode:
                 print("Frame time:", self.idx / loop_rate, self.idx)
                 if audio_start < 0:
                     pad_length = -audio_start
-                    
                     self.history['audio'] = np.array([0] * pad_length + self.total_audio[:audio_end].tolist())
                 else:
                     self.history['audio'] = self.total_audio[audio_start:audio_end]
-                # try:
                 hist_actions = self.execute_action(hist_actions)
-                # except Exception as e:
-                #     print("Error in execute action", e)
-                #     is_run = False
-                # time.sleep(0.1)
-        filepath = f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{self.run_id}/actions.txt'
-        np.savetxt(filepath, hist_actions, fmt='%s')
+            else:
+                break
+        # filepath = f'/home/punygod_admin/SoundSense/soundsense/gt_inference/{self.run_id}/actions.txt'
+        # np.savetxt(filepath, hist_actions, fmt='%s')
         print("Ending run loop")
 
     def execute_action(self, hist_actions=[]):
@@ -217,7 +216,7 @@ class RobotNode:
             
         # print(len(video))
         if save:
-            stacked = np.vstack(video)
+            stacked = np.hstack(video)
             # cv2.imwrite('stacked.jpg', stacked)
             stacked = cv2.resize(stacked,(0, 0), fx = 3, fy = 3)
             self.stacked = stacked
@@ -232,11 +231,11 @@ class RobotNode:
                 # exit()
                 temp -= temp.min()
                 temp /= temp.max()
-                temp = cv2.rotate(temp, cv2.ROTATE_90_CLOCKWISE)
+                # temp = cv2.rotate(temp, cv2.ROTATE_90_CLOCKWISE)
                 temp = cv2.resize(temp, self.stacked.shape[:2][::-1])
                 temp = (temp * 255).astype(np.uint8)
                 temp = cv2.applyColorMap(temp, cv2.COLORMAP_VIRIDIS)
-                self.stacked = np.hstack([self.stacked, temp])
+                self.stacked = np.vstack([self.stacked, temp])
 
         # cam_gripper_framestack,audio_clip_g
         # vg_inp: [batch, num_stack, 3, H, W]

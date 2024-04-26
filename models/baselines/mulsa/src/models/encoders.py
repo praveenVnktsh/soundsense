@@ -56,7 +56,8 @@ class Encoder(nn.Module):
         assert len(x.values()) == 1
         x = list(x.values())[0]
         
-        # h_v = x.register_hook(self.vision_activation_hook)
+        if x.requires_grad:
+            h_v = x.register_hook(self.vision_activation_hook) ## chages this to get gradients
         self.vision_activations = x
         
         x = self.avgpool(x)
@@ -90,8 +91,8 @@ class Spec_Encoder(Encoder):
         #     log_spec /= log_spec.sum(dim=-2, keepdim=True)  # [1, 64, 100]
         x = super().forward(log_spec)       # .squeeze(0) when training, remove otherwise
         self.audio_activations = x
-
-        # h_a = x.register_hook(self.audio_activation_hook)
+        if x.requires_grad:
+            h_a = x.register_hook(self.audio_activation_hook) ## chages this to get gradients
         return x
     
     def audio_activation_hook(self, grad):

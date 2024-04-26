@@ -81,10 +81,15 @@ class ImitationEpisode(Dataset):
             p_apply *= 0.5
             self.transform_cam = A.Compose([
                 # A.Resize(height=self.resized_height_v, width=self.resized_width_v),
-                A.GaussianBlur(
-                    sigma_limit=(0.2, 0.6),
-                    p=p_apply[0]
-                ),  # Gaussian blur with 10% probability
+                # A.GaussNoise(
+                #     var_limit=(0.0001, 0.0008),
+                # ),
+                # A.ISONoise(),
+                # A.GaussianBlur(
+                #     sigma_
+                # limit=(0.2, 0.6),
+                #     p=p_apply[0]
+                # ),  # Gaussian blur with 10% probability
                 A.OneOf([
                     A.RandomBrightnessContrast(
                         brightness_limit=0.15,
@@ -127,6 +132,8 @@ class ImitationEpisode(Dataset):
     def load_image(self, idx):
         img_path = self.image_paths[idx]
         image = np.array(Image.open(img_path)).astype(np.float32) / 255.0 # RGB FORMAT ONLY
+        image += np.random.randn(*image.shape) * np.random.rand(1) * 0.03
+        image = np.clip(image, 0, 1)
         return image
     
     def __len__(self):
@@ -208,6 +215,7 @@ class ImitationEpisode(Dataset):
             audio_end = idx * self.resolution
             audio_start = audio_end - self.audio_len * self.resample_rate_audio
             mel = self.audio_processor.process(self.audio_gripper, audio_start, audio_end, clip_and_resample=True).float()
+            
         else:
             mel = 0
  

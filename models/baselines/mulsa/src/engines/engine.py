@@ -18,10 +18,11 @@ class ImiEngine(LightningModule):
         self.val_loader = val_loader
         self.scheduler = scheduler
         self.config = config
-
+        loss_weights = np.array(config['loss_weights'])
+        loss_weights = loss_weights / np.sum(loss_weights)
         self.loss_cce = torch.nn.CrossEntropyLoss(
             reduction='mean',
-            weight= torch.tensor(config['loss_weights']),
+            weight= torch.tensor(loss_weights),
             # ignore_index=10
         )
         self.validation_step_outputs = []

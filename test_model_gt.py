@@ -13,9 +13,10 @@ if __name__ == "__main__":
     # 86 - move left
     # 30 - move right
     model_root = "/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/lightning_logs/"
-    model_root += "sorting_imi_vg_ag_lstm_seqlen_3_mha_spec04-22-19:26:28"
+    model_root += "Fri-04-26-10:17sorting_imi_vg_ag_simple_seqlen_1_mha_spec_audio_len_5_num_stacks_6"
     model_root += '/'
     model_name = 'last.ckpt'
+    # model_name = ';astckpt'
     # model_name = '04-09-15:48:16-v1.ckpt'
     print("Loading hparams from ", model_root + "hparams.yaml")
     import os
@@ -23,7 +24,7 @@ if __name__ == "__main__":
     
     model = MULSAInference(
         config_path = model_root + "hparams.yaml",
-    )
+    ).cuda()
 
     model.load_state_dict(
         torch.load(

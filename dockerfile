@@ -10,6 +10,7 @@ RUN curl -s -L https://nvidia.github.io/nvidia-docker/ubuntu20.04/nvidia-docker.
 RUN sudo apt-get update
 RUN sudo apt-get install -y nvidia-docker2
 RUN sudo apt-get install -y nvidia-container-toolkit
+RUN sudo apt-get install ros-noetic-cv-bridge
 
 # install ros packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
