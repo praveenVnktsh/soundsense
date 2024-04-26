@@ -16,6 +16,8 @@ from std_msgs.msg import Header
 import json
 import os
 import datetime
+import glob
+from pynput import keyboard
 
 keypress = None
 def on_press(key):
@@ -29,14 +31,22 @@ def on_release(key):
 
 
 class RobotNode:
-    def __init__(self, config_path, run_id = 0):
-        Data_PATH = '/home/praveen/dev/mmml/soundsense/data/dagger_data'
-        os.makedirs(Data_PATH, exist_ok=True)
+    def __init__(self, config_path, model_name):
         rospy.init_node("test_model")
+        self.model_name = model_name
         self.r = stretch_body.robot.Robot()
         self.boot_robot()
-
+        listener = keyboard.Listener(
+            on_press=on_press,
+            on_release=on_release)
+        listener.start()
         self.testing = False
+
+        self.model_pub = rospy.Publisher("/load_model", String, queue_size=1)
+        for i in range(2):
+            self.model_pub.publish(String(data=model_name))
+            time.sleep(1)
+        
         
         with open(config_path) as info:
             config = yaml.load(info.read(), Loader=yaml.FullLoader)
@@ -47,6 +57,7 @@ class RobotNode:
         self.audio_n_seconds = config['audio_len']
         cam = config['camera_id']
         self.n_stack_images = config['num_stack']
+        print("NUM_STACK", self.n_stack_images)
         self.norm_audio = config['norm_audio']
         self.history = {
             'audio': [],
@@ -59,6 +70,7 @@ class RobotNode:
             # rospy.wait_for_message('/audio/audio', AudioData, timeout=10)
         self.cap  = cv2.VideoCapture(cam)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
 
         self.seq_len = config['output_sequence_length']
         self.output_dim = config['action_dim']
@@ -76,16 +88,16 @@ class RobotNode:
 
         self.image_pub = rospy.Publisher('/raw_image', Image, queue_size=1)
         self.audio_pub = rospy.Publisher('/raw_audio', AudioDataStamped, queue_size=1)
-
+        self.images = sorted(glob.glob('/home/hello-robot/soundsense/soundsense/data/sorting/15/video/*.png'))
         # make a uint8 list of actions subscriber
         self.outputs_sub = rospy.Subscriber('/model_outputs', String, self.get_model_inference)
         self.bridge = CvBridge()
-        self.episode_audio = []
-
-        self.root = Data_PATH + f'/{run_id}'
-        self.file = open(f'{self.root}/keyboard_teleop.txt', 'w')
+        self.last_exec_time = time.time()
+        self.idx = 0
     
     def execute_action(self, sequence):
+        if abs(self.last_exec_time - time.time()) < 0.1:
+            return
         r = self.r
         mapping = {
             'w': 0,
@@ -125,19 +137,18 @@ class RobotNode:
                 r.end_of_arm.move_by('wrist_pitch', -np.pi * 6/ 180.0)
         if inv_mapping[action_idx] != 'none' and not self.testing:
             r.push_command()
+        self.last_exec_time = time.time()
+        
 
 
     def get_model_inference(self, data):
         predictions = np.array(json.loads(data.data))
-        self.execute_action(predictions)
+        # self.execute_action(predictions)
         
 
     def audio_callback(self, data):
-        audio = np.frombuffer(data.data, dtype=np.int16).copy().astype(np.float64)
-        audio /= 32768
-        audio = audio.tolist()
+        audio = np.frombuffer(data.data, dtype=np.int16).tolist()
         self.history['audio']+= (audio)
-        self.episode_audio += []
         if len(self.history['audio']) > self.audio_n_seconds * self.hz:
             self.history['audio'] = self.history['audio'][-self.audio_n_seconds * self.hz:]
 
@@ -154,7 +165,7 @@ class RobotNode:
                 print("Exiting...")
                 exit()
 
-        self.r.arm.move_to(0.25)
+        self.r.arm.move_to(0.1)
         self.r.lift.move_to(1.075)
         self.r.end_of_arm.move_to('wrist_pitch', 0.0)
         self.r.end_of_arm.move_to('wrist_yaw', 0.0)
@@ -169,41 +180,44 @@ class RobotNode:
     def get_image(self):
         h, w = self.image_shape 
         ret, frame = self.cap.read()
-        frame = cv2.resize(frame, (h, w))
+        # frame = np.zeros((h, w, 3), dtype = np.uint8)
+        # ret = True
+        # self.idx += 1
+        # self.idx %= len(self.images)
+        # frame = cv2.imread(self.images[self.idx])
+        # ret = True
+        # time.sleep(0.1)
+        frame = cv2.resize(frame, (h, w), interpolation=cv2.INTER_NEAREST)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame = frame.astype(np.float32) / 255
         if not ret:
             return None
         return frame
 
     def run_loop(self, visualize = False):
         is_run = True
-        start_time = time.time()
-        loop_rate = 10
-        loop_start_time = time.time()
         
+        loop_start_time = time.time()
         n_stack = self.n_stack_images * self.audio_n_seconds
-
-        rate = rospy.Rate(loop_rate)
         last_exec_time = time.time()
         while is_run:
-            start_time = time.time()
+            
             frame = self.get_image()
             curtime = time.time()
             self.history['video'].append(frame)
             self.history['timestamps'].append(curtime)
-            if len(self.history['video']) > n_stack:
+            if len(self.history['video']) >= n_stack:
                 while self.history['timestamps'][-1] - self.history['timestamps'][0] > self.audio_n_seconds:
                     self.history['video'] = self.history['video'][1:]
                     self.history['timestamps'] = self.history['timestamps'][1:]
             
-            if time.time() - loop_start_time > self.audio_n_seconds + 1: # warmup
-                if (time.time() - last_exec_time) > 1/loop_rate:
+            if time.time() - loop_start_time > self.audio_n_seconds: # warmup
+                if abs(last_exec_time - time.time() )> 0.1:
+                    # print(self.history['timestamps'][-1] - time.time(), self.history['timestamps'][0] - time.time())
                     self.generate_inputs()
-                last_exec_time = time.time()
-                
-            # rate.sleep()
-            print(time.time() - start_time, len(self.history['video']), len(self.history['audio']))
+                    last_exec_time = time.time()
+            
+
+            # print(len(self.history['video']), len(self.history['audio']))
 
         print("Ending run loop")
 
@@ -212,38 +226,44 @@ class RobotNode:
         video = self.history['video'].copy() # subsample n_frame s of interest
         n_images = len(video)
 
+        video = video[(n_images % self.n_stack_images):]
         choose_every = n_images // self.n_stack_images
-        print(n_images, choose_every, self.n_stack_images)
-        
-
         video = video[::choose_every]
+        assert len(video) == self.n_stack_images
         
         if self.use_audio:
-            audio = torch.tensor(self.history['audio']).float()
-            # mel = self.audio_processor.process(audio, 0, audio.size(-1))
-            audio_to_send = audio.numpy().tobytes()
+            audio_to_send = np.array(self.history['audio'], dtype = np.int16).tobytes()
         
         else:
             audio_to_send = []
 
         stacked = np.hstack(video)
-        stacked *= 255
-        stacked = stacked.astype(np.uint8)
+        print(np.mean(stacked), np.std(stacked))
         c = str(keypress).replace("'", '')
+        # print("Keypress: ", c)
 
         header = Header(
             stamp = rospy.Time.now(),
             frame_id = c
         )
-        imgmsg = self.bridge.cv2_to_imgmsg(stacked)
+        imgmsg = self.bridge.cv2_to_imgmsg(stacked, encoding = 'rgb8')
+        # imgmsg = Image()
+        # imgmsg.data = stacked.tostring()
+        # imgmsg.height = stacked.shape[0]
+        # imgmsg.width = stacked.shape[1]
+        # imgmsg.encoding = 'rgb8'
         imgmsg.header = header
         self.image_pub.publish(imgmsg)
-        
+        header.frame_id = self.model_name
+        # sf.write('audio.wav', np.array(self.history['audio'], dtype = np.int16), 16000)
         self.audio_pub.publish(AudioDataStamped(
             audio = AudioData(data = audio_to_send),
             header = header
         ))
-        print("published")
+        self.model_pub.publish(String(data=self.model_name))
+
+        if c == 'q':
+            exit()
 
 
 

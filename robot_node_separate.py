@@ -208,7 +208,7 @@ class RobotNode:
         n_images = len(video)
 
         choose_every = n_images // self.n_stack_images
-        print(n_images, choose_every, self.n_stack_images)
+        
         
 
         video = video[::choose_every]
@@ -227,6 +227,7 @@ class RobotNode:
         header = Header(
             stamp = rospy.Time.now()
         )
+        print(stacked.shape, len(audio_to_send))
         imgmsg = self.bridge.cv2_to_imgmsg(stacked)
         imgmsg.header = header
         self.image_pub.publish(imgmsg)
