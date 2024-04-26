@@ -44,7 +44,10 @@ class MULSAInference(pl.LightningModule):
         )
         self.root = '/home/soundsense/data/mulsa/dagger'
         self.run_id = 1
-        shutil.rmtree(self.root)  # remove dir and all contains
+        try:
+            shutil.rmtree(self.root)  # remove dir and all contains
+        except:
+            pass
         os.makedirs(self.root + f'/{self.run_id}/video', exist_ok=True)
         os.makedirs(self.root + f'/{self.run_id}/audio', exist_ok=True)
         self.file = open(self.root + f'/{self.run_id}/keyboard_teleop.txt', 'w')
@@ -54,8 +57,6 @@ class MULSAInference(pl.LightningModule):
     def load_model(self, data):
         if self.model_name == data.data:
             return
-        
-
         print("Received model load request from ", data.data)
         data = data.data
         model_root = "/home/soundsense/models/baselines/mulsa/lightning_logs/"
@@ -66,6 +67,8 @@ class MULSAInference(pl.LightningModule):
         with open(config_path) as info:
             self.config = yaml.load(info.read(), Loader=yaml.FullLoader) 
 
+        rospy.set_param('config', json.dumps(self.config))
+
         v_encoder = make_vision_encoder(self.config['encoder_dim'])
         a_encoder = make_audio_encoder(self.config['encoder_dim'] * self.config['num_stack'], self.config['norm_audio'])
         self.use_audio = "ag" in self.config["modalities"].split("_")
@@ -74,7 +77,6 @@ class MULSAInference(pl.LightningModule):
         self.loss_cce = torch.nn.CrossEntropyLoss(weight= torch.tensor([1]*self.config['action_dim']))
 
         self.audio_processor = AudioProcessor(self.config)
-        
         self.h = self.config['resized_height_v']
         self.w = self.config['resized_width_v']
         self.load_state_dict(
@@ -86,7 +88,7 @@ class MULSAInference(pl.LightningModule):
         self.model_loaded = True
         self.model_name = data
         
-        print("Model loaded", model_name)
+        print("Model loaded", model_root + model_name)
         print("device", self.device)
 
 
@@ -117,18 +119,16 @@ class MULSAInference(pl.LightningModule):
             audio = np.frombuffer(audio.audio.data, dtype=np.int16).astype(np.float32)
             audio /= 32768.0
             audio = torch.tensor(audio, dtype=torch.float32).unsqueeze(0)
-            mel = self.audio_processor.process(audio, 0, audio.size(-1)).to(self.device)
-            # print(mel.shape)
+            mel = self.audio_processor.process(audio, 0, audio.size(-1)).to(self.device).unsqueeze(00)
             
             # plt.imsave(self.root + f'/{self.run_id}/audio/audio.png', mel.squeeze().numpy())
             # sf.write(self.root + f'/{self.run_id}/audio/audio.wav', audio.squeeze().numpy(), self.config['resample_rate_audio'])
-            # np.save(self.root + f'/{self.run_id}/audio/{time}.npy', mel.detach().numpy())
+            np.save(self.root + f'/{self.run_id}/audio/{time}.npy', mel.cpu().detach().numpy())
         else:
             mel = None
 
         annotation = str(imagedata.header.frame_id)
         if annotation == 'q':
-            self.model_loaded = False
             self.file.close()
             self.run_id += 1    
             os.makedirs(self.root + f'/{self.run_id}/video', exist_ok=True)
@@ -136,8 +136,8 @@ class MULSAInference(pl.LightningModule):
             self.file = open(self.root + f'/{self.run_id}/keyboard_teleop.txt', 'w')
             return
         print(time, annotation)
-        # self.file.write(time + " " + annotation + "\n")
-        # cv2.imwrite(self.root + f'/{self.run_id}/video/' + str(time) + '.png', image)
+        self.file.write(time + " " + annotation + "\n")
+        cv2.imwrite(self.root + f'/{self.run_id}/video/' + str(time) + '.png', (image * 255).astype(np.uint8))
         # cv2.imwrite('temp.png', (image * 255).astype(np.uint8) )
         
 
@@ -159,8 +159,20 @@ class MULSAInference(pl.LightningModule):
         out = self.forward({"video": images, "audio": mel})
         out = out.detach().cpu().numpy().squeeze(0)
         sequence = []
+
+        mapping = {
+            'w': 0,
+            's': 1,
+            'n': 2,
+            'm': 3,
+            'k': 4,
+            'j': 5,
+            'l': 6,
+            'None': 7
+        }
         for o in out:
             sequence.append(np.argmax(o))
+            # sequence.append(mapping[annotation])
 
         sequence = np.array(sequence, dtype = np.int32)
         msg = String(data=json.dumps(sequence.tolist()))
@@ -190,7 +202,7 @@ class MULSAInference(pl.LightningModule):
 
 if __name__ == "__main__":
     import os
-    model = MULSAInference()
+    model = MULSAInference().cuda()
     model.eval()    
     model.start_pub_sub()
 

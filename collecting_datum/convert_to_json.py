@@ -28,7 +28,7 @@ mapping = {
 }
 
 # for folder
-og_root = '/home/punygod_admin/SoundSense/soundsense/data/mulsa/sorting'
+og_root = '/home/soundsense/data/mulsa/dagger_1'
 print(len(os.listdir(og_root)))
 for run_id in os.listdir(og_root):
     root = f'{og_root}/{run_id}'
@@ -38,7 +38,8 @@ for run_id in os.listdir(og_root):
         
         actions = []
         for line in data:
-            line = line.split('\t')[1].strip()
+            print(line)
+            line = line.split(' ')[1].strip()
             action = [0] * (len(mapping) + 1)
             
             if line in mapping.keys():

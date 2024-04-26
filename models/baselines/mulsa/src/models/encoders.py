@@ -46,8 +46,8 @@ class Encoder(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         if out_dim is not None:
             self.fc = nn.Linear(512, out_dim)
-        self.vision_gradients = None
-        self.vision_activations = None
+        self.gradients = None
+        self.activations = None
 
     def forward(self, x):
         # print("x",x.shape)
@@ -57,17 +57,17 @@ class Encoder(nn.Module):
         x = list(x.values())[0]
         
         if x.requires_grad:
-            h_v = x.register_hook(self.vision_activation_hook) ## chages this to get gradients
-        self.vision_activations = x
-        
+            h = x.register_hook(self.activation_hook) ## changes this to get gradients
+        self.activations = x
+
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         if self.fc is not None:
             x = self.fc(x)
         return x
 
-    def vision_activation_hook(self, grad):
-        self.vision_gradients = grad
+    def activation_hook(self, grad):
+        self.gradients = grad
 
 class Spec_Encoder(Encoder):
     def __init__(self, feature_extractor, out_dim=None, norm_audio=False):
@@ -77,8 +77,8 @@ class Spec_Encoder(Encoder):
         # self.mel = torchaudio.transforms.MelSpectrogram(
         #     sample_rate=sr, n_fft=int(sr * 0.025), hop_length=int(sr * 0.01), n_mels=64
         # )
-        self.audio_gradients = None
-        self.audio_activations = None
+        # self.audio_gradients = None
+        # self.audio_activations = None
 
     def forward(self, log_spec):
         # EPS = 1e-8
@@ -90,13 +90,13 @@ class Spec_Encoder(Encoder):
         # if self.norm_audio:
         #     log_spec /= log_spec.sum(dim=-2, keepdim=True)  # [1, 64, 100]
         x = super().forward(log_spec)       # .squeeze(0) when training, remove otherwise
-        self.audio_activations = x
-        if x.requires_grad:
-            h_a = x.register_hook(self.audio_activation_hook) ## chages this to get gradients
+        # self.audio_activations = x
+        # if x.requires_grad:
+        #     h_a = x.register_hook(self.audio_activation_hook) ## chages this to get gradients
         return x
     
-    def audio_activation_hook(self, grad):
-        self.audio_gradients = grad
+    # def audio_activation_hook(self, grad):
+    #     self.audio_gradients = grad
 
 class ASTEncoder(nn.Module):
     def __init__(self, out_dim=None):
@@ -171,6 +171,7 @@ def make_audio_encoder(out_dim=None, norm_audio=False, model="spec"):
             3, 64, kernel_size=7, stride=1, padding=3, bias=False
         )
         audio_extractor = create_feature_extractor(audio_extractor, ["layer4.1.relu_1"])
+        # print("audio_extractor", audio_extractor)
         return Spec_Encoder(audio_extractor, out_dim, norm_audio)
     elif model == "ast":
         return ASTEncoder(out_dim)

@@ -185,13 +185,13 @@ class Actor(torch.nn.Module):
 
     
     def get_activations_gradient(self):
-        return self.v_encoder.vision_gradients, self.a_encoder.audio_gradients
+        return self.v_encoder.gradients, self.a_encoder.gradients
 
     def get_activations(self):
         if "ag" in self.modalities:
-            return self.v_encoder.vision_activations.detach(), self.a_encoder.audio_activations.detach()
+            return self.v_encoder.activations.detach(), self.a_encoder.activations.detach()
         else:
-            return self.v_encoder.vision_activations.detach(), None
+            return self.v_encoder.activations.detach(), None
     
 if __name__ == "__main__":
     from encoders import make_vision_encoder, make_audio_encoder

@@ -41,18 +41,36 @@ mapping = {
 
 inv_mapping = {v: k for k, v in mapping.items()}
 
+## 
 
-def gradcam(model, img, idx):
+## "sorting_imi_vg_ag_lstm_seqlen_3_mha_spec_pretrained04-24-17:22:04"
+## "sorting_imi_vg_ag_lstm_seqlen_3_spec04-22-21:39:20"
+## "sorting_imi_vg_ag_simple_seqlen_1_spec04-22-17:19:32"
+## "sorting_imi_vg_ag_simple_seqlen_1_mha_spec04-22-15:08:58"
+## "sorting_imi_vg_ag_lstm_seqlen_3_mha_spec04-22-19:26:28"
+## "sorting_imi_vg_simple_seqlen_1_spec04-22-07:46:29"
+## "sorting_imi_vg_simple_seqlen_1_mha_spec04-22-04:18:40"
+## "sorting_imi_vg_lstm_seqlen_3_spec04-22-00:48:38"
+## "sorting_imi_vg_lstm_seqlen_3_mha_spec04-21-21:13:43"
+
+path = "sorting_imi_vg_ag_lstm_seqlen_3_spec04-22-21:39:20"
+seq = True
+
+def gradcam(model, img, idx, seq= False):
     # Forward pass through the model
     output = model(img)
-    output = output[0]
+    # print(output.shape)
+    if seq:
+        output = output[0][-1,].unsqueeze(0)
+    else:
+        output = output[0]
     # plt.imshow(output.cpu().detach().numpy())
     # plt.colorbar()
-    print(output.shape)
+    # print(output.shape)
 
     # Obtain the predicted class
     _, predicted_class = torch.max(output.data, 1)
-    print(predicted_class)
+    # print(predicted_class)
 
     # Compute the gradients of the predicted class output with respect to the feature maps
     model.zero_grad()
@@ -82,7 +100,7 @@ def gradcam(model, img, idx):
 
     # Normalize the heatmap
     v_heatmap = torch.maximum(v_heatmap, torch.zeros_like(v_heatmap))
-    print("v_heatmap: ", v_heatmap.shape) # torch.Size([6, 5, 7])
+    # print("v_heatmap: ", v_heatmap.shape) # torch.Size([6, 5, 7])
     # print(type(v_heatmap)) # <class 'torch.Tensor'>
     # print(torch.max(torch.max(v_heatmap, dim=1)[0], dim=1)[0]) 
 
@@ -90,11 +108,11 @@ def gradcam(model, img, idx):
     for i in range(v_heatmap.shape[0]):
         v_heatmap[i] /= v_heatmap_max[i]
 
-    print("v_heatmap: ", v_heatmap.shape) # torch.Size([6, 5, 7])
+    # print("v_heatmap: ", v_heatmap.shape) # torch.Size([6, 5, 7])
     
     # Resize the heatmap to match the input image size
 
-    print("img[0].shape: ", img["video"].shape) # torch.Size([6, 3, 75, 100])
+    # print("img[0].shape: ", img["video"].shape) # torch.Size([6, 3, 75, 100])
     img["video"] = torch.tensor(img["video"]).permute(0, 3, 1, 2)
 
     v_heatmap = v_heatmap.numpy()
@@ -107,33 +125,50 @@ def gradcam(model, img, idx):
     v_heatmap_resized = np.minimum(v_heatmap_resized, 255)
     # print("v_heatmap_resized: ", v_heatmap_resized.shape) # (6, 75, 100)   
 
-    # Apply the heatmap to the input image
+ 
     superimposed_img_v = np.zeros((v_heatmap.shape[0], img["video"].shape[2], img["video"].shape[3], 3))
     for i in range(v_heatmap.shape[0]):
-        temp_heatmap = (1 - cv2.applyColorMap(v_heatmap_resized[i], cv2.COLORMAP_JET) / 255)
+        temp_heatmap = 1 - cv2.applyColorMap(v_heatmap_resized[i], cv2.COLORMAP_JET) / 255
         # print(min(temp_heatmap.flatten()), max(temp_heatmap.flatten())) # 0 1
-        temp_img = img["video"][i].cpu().numpy().transpose(1, 2, 0)
+        temp_img = img["video"][i].cpu().numpy().transpose(1, 2, 0)*0.5 + 0.5
         # print(min(temp_img.flatten()), max(temp_img.flatten())) # 0 1
-        superimposed_img_v[i] = temp_heatmap * 0.3 + temp_img * 0.7
+        superimposed_img_v[i] = temp_heatmap * 0.5 + temp_img * 0.5
 
-    superimposed_imgs = np.hstack(superimposed_img_v)
-    # Display the input image and the GradCAM heatmap with colorbar
-    # fig, axs = plt.subplots(1, 6, figsize=(10, 30))
+    # # Display the input image and the GradCAM heatmap with colorbar
+    # fig, axs = plt.subplots(6, 2, figsize=(10, 30))
     # for i in range(6):
-    #     fig.colorbar(axs[0, i].imshow(superimposed_img_v[i]), ax=axs[i, 1], cmap='jet')
-    plt.axis('off')
-    plt.imshow(superimposed_imgs)
-    
-    plt.savefig(f"/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/gradcam/sorted_1/{idx}_gradcam_{inv_mapping[int(predicted_class.cpu().numpy())]}.png", bbox_inches='tight')
+    #     axs[i, 0].imshow(img[0][i].cpu().numpy().transpose(1, 2, 0)*0.5 + 0.5)
+    #     fig.colorbar(axs[i, 1].imshow(superimposed_img_v[i]), ax=axs[i, 1], cmap='jet')
+    fig, axs = plt.subplots(1, 6, figsize=(18, 6))  # 2 rows and 6 columns
+
+    for i in range(6):
+        # Show images in the first row
+        # axs[0, i].imshow(img["video"][i].cpu().numpy().transpose(1, 2, 0) * 0.5 + 0.5)
+        # axs[0, i].axis('off')  # Hide axes for a cleaner look
+
+        # Show Grad-CAM heatmaps in the second row
+        im = axs[i].imshow(superimposed_img_v[i], cmap='jet')
+        axs[i].axis('off')  # Hide axes for a cleaner look
+        # fig.colorbar(im, ax=axs[1, i])  # Add a colorbar for each heatmap
+
+    # Adjust layout to prevent overlap
+    fig.tight_layout()
+
+    # Save the figure 
+    plt.savefig("/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/gradcam/" + path + f"/{idx}_gradcam_{inv_mapping[int(predicted_class.cpu().numpy())]}.png", bbox_inches='tight')
 
 
 if __name__ == "__main__":
-    model_path = "/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/lightning_logs/sorting_imi_vg_simple_seqlen_1_mha_spec04-22-04:18:40/last.ckpt"
-    config_path = '/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/lightning_logs/sorting_imi_vg_simple_seqlen_1_mha_spec04-22-04:18:40/hparams.yaml'
+    model_path = "/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/lightning_logs/"+ path + "/last.ckpt"
+    config_path = "/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/lightning_logs/" + path + "/hparams.yaml"
     with open(config_path) as f:
             config = yaml.load(f, Loader=yaml.FullLoader)
 
     model = MULSAInference(config_path)
+
+    ## create directory if not there
+    if not os.path.exists("/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/gradcam/" + path):
+        os.makedirs("/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/gradcam/" + path)
 
     # Load the model from the checkpoint
     model.load_state_dict(
@@ -154,7 +189,7 @@ if __name__ == "__main__":
     split = int(config['train_val_split']*len(run_ids))
     train_episodes = run_ids[:split]
     # val_episodes = run_ids[split:]
-    val_episodes = run_ids[-1]
+    val_episodes = run_ids[-1:]
 
     print("Train episodes: ", len(train_episodes))
     print("Val episodes: ", len(val_episodes))
@@ -171,11 +206,13 @@ if __name__ == "__main__":
             for run_id in val_episodes
         ]
     )
-
+    # print(val_episodes)
+    for run_id in val_episodes:
+        print(run_id)
     # train_loader = DataLoader(train_set, config["batch_size"], num_workers=config["num_workers"])
     val_loader = DataLoader(val_set, num_workers=config["num_workers"], shuffle=False, batch_size=1)
 
-    print(len(train_set), len(val_set))
+    # print(len(train_set), len(val_set))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     for i, (img, target) in enumerate(val_loader):
         img[0] = img[0].squeeze(0)
@@ -186,5 +223,5 @@ if __name__ == "__main__":
         # Forward pass through the model
         # output = model(inp)
 
-        gradcam(model, inp, i)
-        break
+        gradcam(model, inp, i, seq)
+        # break

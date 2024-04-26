@@ -81,15 +81,6 @@ class ImitationEpisode(Dataset):
             p_apply *= 0.5
             self.transform_cam = A.Compose([
                 # A.Resize(height=self.resized_height_v, width=self.resized_width_v),
-                # A.GaussNoise(
-                #     var_limit=(0.0001, 0.0008),
-                # ),
-                # A.ISONoise(),
-                # A.GaussianBlur(
-                #     sigma_
-                # limit=(0.2, 0.6),
-                #     p=p_apply[0]
-                # ),  # Gaussian blur with 10% probability
                 A.OneOf([
                     A.RandomBrightnessContrast(
                         brightness_limit=0.15,

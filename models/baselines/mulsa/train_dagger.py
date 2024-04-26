@@ -6,7 +6,7 @@ import os
 sys.path.append(f'{os.environ["SOUNDSENSE_ROOT"]}/models')
 os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
 
-from imi_datasets import ImitationEpisode
+from imi_datasets_dagger import ImitationEpisode
 from src.models.encoders import (
     make_vision_encoder,
     make_audio_encoder,
@@ -38,18 +38,11 @@ def main(config):
     split = int(config['train_val_split']*len(run_ids))
     train_episodes = run_ids[:split]
     val_episodes = run_ids[split:]
-    # train_episodes = run_ids
-    # val_episodes = run_ids
-    # train_episodes = run_ids[:3]
-    # val_episodes = run_ids[:1]
-
     print("Train episodes: ", len(train_episodes))
     print("Val episodes: ", len(val_episodes))
     config['train_episodes'] = train_episodes
     config['val_episodes'] = val_episodes
     print(train_episodes)
-    # exit()
-
 
     train_set = torch.utils.data.ConcatDataset(
         [
@@ -88,36 +81,15 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config_path", type=str, default="/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/conf/new/train.yaml", help="Path to config file")
-    parser.add_argument("--mha", action='store_true', help="Use MHA")
-    parser.add_argument("--decoder", type=str, help="Decoder type", 
-                        choices=['layered', 'multi_head', 'lstm', 'simple'], required=True)
-    parser.add_argument("--use_audio", action='store_true', help="Use audio")
-    parser.add_argument('--output_sequence_length', type=int, required=True, help='Output sequence length')
-    parser.add_argument('--audio_len', type=int, help='Output sequence length')
-    parser.add_argument('--audio_encoder', type=str, default='spec', help='Audio encoder', choices=['spec', 'ast', 'hubert'])
-    
-    args = parser.parse_args()
-    
+    parser.add_argument("--base_model", type=str, default="Fri-04-26-09:54sorting_imi_vg_ag_simple_seqlen_1_mha_spec_audio_len_5_num_stacks_6", help="Path to config file")
+    parser.add_argument("--dagger_run_id", type=int, default=0, help="Dagger run id")    
 
-    with open(args.config_path) as f:
+    root = '/home/punygod_admin/SoundSense/soundsense/models/basqelines/mulsa/lightning_logs'
+    args = parser.parse_args()
+    with open(f'/home/punygod_admin/SoundSense/soundsense/models/baselines/mulsa/conf/new/dagger.yaml') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
-    config['use_mha'] = args.mha
-    config['decoder_type'] = args.decoder
-    config['output_sequence_length'] = args.output_sequence_length
-    if args.audio_len:
-        config['audio_len'] = args.audio_len
-    if args.use_audio:
-        config['modalities'] = 'vg_ag'
-    else:
-        config['modalities'] = 'vg'
-    
-    config['audio_encoder'] = args.audio_encoder
-    config['exp_name'] = 'imi_' + config['modalities'] + '_' + config['decoder_type'] + "_seqlen_" + str(config['output_sequence_length'])
-    if config['use_mha']:
-        config['exp_name'] += '_mha'
-    config['exp_name'] += "_"+config['audio_encoder'] 
-    config['exp_name'] = config['dataset_root'].split('/')[-1] + '_' + config['exp_name']
+    config['exp_name'] = f'dagger_run_{args.dagger_run_id}_{args.base_model}'
+    config.update(vars(args))
 
     main(config)
